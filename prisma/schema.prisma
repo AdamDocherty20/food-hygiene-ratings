@@ -1,0 +1,59 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Establishment {
+  id Int @id @default(autoincrement())
+
+  // FSA's stable national identifier
+  fhrsId Int @unique
+
+  // Local authority's own identifier; unique only within that authority
+  localAuthorityBusinessId String
+
+  businessName   String
+  businessType   String
+  businessTypeId Int
+
+  addressLine1 String?
+  addressLine2 String?
+  addressLine3 String?
+  addressLine4 String?
+  postcode     String?
+
+  // "0"-"5" for FHRS, or a status string ("Pass", "Improvement Required",
+  // "Awaiting Inspection", "Exempt", "Awaiting Publication") for FHIS
+  ratingValue String
+  ratingKey   String
+  ratingDate  DateTime?
+
+  schemeType String
+
+  latitude  Float?
+  longitude Float?
+
+  localAuthorityName String
+  localAuthorityCode String
+
+  // Soft-delete flag for establishments that drop out of the FSA feed
+  isActive Boolean @default(true)
+
+  // Updated on every sync run in which this record appears
+  lastSeenAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([postcode])
+  @@index([latitude, longitude])
+}
