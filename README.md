@@ -179,6 +179,58 @@ Errors: `400` for a missing/out-of-range `lat` or `lng`, or an invalid `radiusMi
 (a `radiusMiles` above 10 is silently capped, not rejected — only non-numeric or
 non-positive values are a 400).
 
+### `GET /api/establishments/business-types`
+
+Returns the distinct `businessTypeId` / `businessType` pairs present among active
+establishments, sorted alphabetically by `businessType`. Used to populate the business
+type dropdown on the search page.
+
+**Example**
+
+```
+GET /api/establishments/business-types
+```
+
+```json
+{
+  "data": [
+    { "businessTypeId": 7841, "businessType": "Distributors/Transporters" },
+    { "businessTypeId": 1, "businessType": "Restaurant/Cafe/Canteen" }
+  ]
+}
+```
+
+## Frontend
+
+Two pages, both built against the API routes above (no direct Prisma access from
+page/component code):
+
+- **`/`** — search page. A form (business name, postcode, business type dropdown)
+  updates the URL's query string on submit, so searches are shareable/bookmarkable and
+  work with the browser back/forward buttons. Results render as a list (name, address,
+  rating badge with date) alongside a Leaflet/OpenStreetMap map that drops a marker for
+  every result with coordinates — results without coordinates just don't get a marker.
+  Clicking a result card or a map marker navigates to that establishment's detail page.
+  Pagination controls are wired to the search API's `page`/`pageSize`.
+- **`/establishment/[id]`** — detail page, looked up by `fhrsId`. Shows business name,
+  full address, business type, rating (with date), and local authority, plus a
+  single-point map — omitted entirely (not a broken/empty map) if the establishment has
+  no coordinates.
+
+Both pages share a `RatingBadge` component that branches on `schemeType`: FHRS shows
+the numeric value on a red (0-1) / amber (2-3) / green (4-5) scale, FHIS shows a text
+status badge (Pass / Improvement Required / Exempt / Awaiting Publication). Some FHRS
+rows also carry a non-numeric status (e.g. `AwaitingInspection`, `Exempt`) — those fall
+back to a neutral badge rather than a numeric scale. The rating date is always shown
+next to the badge, on every page — this is an Open Government Licence attribution
+requirement, not just a UX nicety.
+
+Every page includes a footer with the required FSA/OGL attribution line and links to
+[ratings.food.gov.uk](https://ratings.food.gov.uk) and the
+[OGL v3.0 licence text](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+No auth, favourites, or admin features yet.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

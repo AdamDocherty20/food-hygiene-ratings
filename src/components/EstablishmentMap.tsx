@@ -1,0 +1,30 @@
+"use client";
+
+import dynamic from "next/dynamic";
+import type { MapPoint } from "@/components/EstablishmentMapInner";
+
+interface EstablishmentMapProps {
+  points: MapPoint[];
+  heightClassName?: string;
+}
+
+const DEFAULT_HEIGHT_CLASSNAME = "h-[500px]";
+
+// Leaflet touches `window` as soon as it's imported, which breaks server-side
+// rendering — load the actual map only in the browser.
+const EstablishmentMapInner = dynamic(() => import("@/components/EstablishmentMapInner"), {
+  ssr: false,
+  loading: () => (
+    <div
+      className={`flex w-full ${DEFAULT_HEIGHT_CLASSNAME} items-center justify-center rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-500`}
+    >
+      Loading map…
+    </div>
+  ),
+});
+
+export function EstablishmentMap({ points, heightClassName = DEFAULT_HEIGHT_CLASSNAME }: EstablishmentMapProps) {
+  return <EstablishmentMapInner points={points} heightClassName={heightClassName} />;
+}
+
+export type { MapPoint };
