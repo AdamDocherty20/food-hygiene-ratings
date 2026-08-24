@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { jsonError } from "@/lib/api-response";
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /**
  * GET /api/establishments/search
@@ -19,6 +20,9 @@ import { prisma } from "@/lib/prisma";
  * Only isActive: true establishments are returned.
  */
 export async function GET(request: NextRequest) {
+  const limited = enforceRateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
 
   const pagination = parsePagination(searchParams);

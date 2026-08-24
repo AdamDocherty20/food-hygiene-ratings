@@ -3,6 +3,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { jsonError } from "@/lib/api-response";
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const EARTH_RADIUS_MILES = 3959;
 const DEFAULT_RADIUS_MILES = 1;
@@ -67,6 +68,9 @@ function parseRequiredCoordinate(
  * results are sorted nearest-first, with each result annotated with distanceMiles.
  */
 export async function GET(request: NextRequest) {
+  const limited = enforceRateLimit(request);
+  if (limited) return limited;
+
   const { searchParams } = new URL(request.url);
 
   const pagination = parsePagination(searchParams);

@@ -14,9 +14,28 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const SITE_TITLE = "UK Food Hygiene Ratings";
+const SITE_DESCRIPTION =
+  "Search UK Food Standards Agency food hygiene ratings (FHRS/FHIS) by business name, postcode, or type — with map results and the latest inspection rating for every establishment.";
+
 export const metadata: Metadata = {
-  title: "UK Food Hygiene Ratings",
-  description: "Search UK Food Standards Agency food hygiene ratings (FHRS/FHIS).",
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: SITE_TITLE,
+    locale: "en_GB",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

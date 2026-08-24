@@ -23,6 +23,19 @@ export function Footer() {
           </a>
           .
         </p>
+        <p className="mt-1 text-xs text-gray-400">
+          This is an independent, unofficial tool and is not affiliated with or endorsed by the Food Standards
+          Agency. For the official ratings, visit{" "}
+          <a
+            href="https://ratings.food.gov.uk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-gray-600"
+          >
+            ratings.food.gov.uk
+          </a>
+          .
+        </p>
       </div>
     </footer>
   );

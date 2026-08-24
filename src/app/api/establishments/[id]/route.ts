@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError } from "@/lib/api-response";
 import { prisma } from "@/lib/prisma";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 /**
  * GET /api/establishments/[id]
@@ -9,7 +10,10 @@ import { prisma } from "@/lib/prisma";
  * Returns 404 if no establishment with that fhrsId exists, or if it exists but
  * isActive is false (i.e. it's dropped out of the FSA feed).
  */
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const limited = enforceRateLimit(request);
+  if (limited) return limited;
+
   const { id } = await params;
 
   const fhrsId = Number(id);

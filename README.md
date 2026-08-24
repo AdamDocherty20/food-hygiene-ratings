@@ -32,6 +32,11 @@ still present in the FSA's current feed. Every error response is JSON in the sha
 `{ "error": "..." }`, with an appropriate 4xx/5xx status code; malformed input never
 produces an unhandled 500.
 
+Every route is also rate-limited per IP (60 requests/minute; over that returns `429`
+with a `Retry-After` header). This is an in-memory limiter, so it only meaningfully
+protects a single long-lived server process — see `src/lib/rate-limit.ts` for the
+serverless caveat.
+
 Paginated endpoints (`search`, `nearby`) share the same `page` / `pageSize` params and
 response shape:
 
@@ -240,8 +245,22 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## Deploy on Vercel
+## Deploying
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The easiest path is the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js — connect the repo, it detects Next.js automatically, and a custom domain is a few minutes' work in the project's Domains settings (add the domain, then add the DNS record it gives you at your registrar). Any other Next.js-capable host works too; the notes below apply regardless of where it's hosted.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Environment variables to set on the host:**
+
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | yes | See "pooled connection" below — don't reuse the direct connection string from local `.env` on a serverless host. |
+| `NEXT_PUBLIC_SITE_URL` | recommended | Your real domain, e.g. `https://example.com`. Used for Open Graph tags, `robots.txt`, and the sitemap. Defaults to `http://localhost:3000` if unset. |
+| `NEXT_PUBLIC_TILE_URL` / `NEXT_PUBLIC_TILE_ATTRIBUTION` | optional | Override the map tile source (see below). Both default to the free OpenStreetMap tiles if unset. |
+
+**Use Neon's pooled connection string in production.** The `DATABASE_URL` in local `.env` points at Neon's *direct* endpoint, which is fine for a single long-lived process (dev server, the sync script) but will exhaust Neon's connection limit under serverless traffic, where every function invocation can open its own connection. In the Neon dashboard, copy the *pooled* connection string instead (same credentials, hostname has `-pooler` in it) and use that as `DATABASE_URL` on the hosting platform.
+
+**Keep the data fresh.** `npm run sync` is still manual-only — nothing re-runs it automatically. `.github/workflows/sync.yml` runs it daily via GitHub Actions (host-agnostic, works no matter where the app itself is deployed) once the repo is pushed to GitHub and a `DATABASE_URL` secret is added under Settings → Secrets and variables → Actions. Without that secret, the workflow will fail — either add it or disable the workflow if you'd rather sync manually.
+
+**Map tiles.** The map defaults to the free `tile.openstreetmap.org` servers, which is fine for casual/dev traffic, but OSM's usage policy asks higher-volume sites to move to a paid provider (MapTiler, Stadia Maps, Mapbox, etc.) instead of hot-linking their free tiles. If this gets real traffic, sign up with one of those, then set `NEXT_PUBLIC_TILE_URL` and `NEXT_PUBLIC_TILE_ATTRIBUTION` to the values they give you — no code change needed.
+
+**Not included yet:** a shared (cross-instance) rate limit store, and any monitoring/error tracking. Fine for a modest public launch; worth revisiting if traffic grows a lot.

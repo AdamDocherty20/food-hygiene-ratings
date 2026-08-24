@@ -37,6 +37,15 @@ const UK_CENTER: [number, number] = [54.5, -3];
 const UK_DEFAULT_ZOOM = 5;
 const SINGLE_POINT_ZOOM = 16;
 
+// Defaults to the free OpenStreetMap tile servers, which is fine for light/dev traffic
+// but whose usage policy asks higher-volume sites to move to a paid provider (MapTiler,
+// Stadia, Mapbox, etc.) instead. Both are overridable via env vars so switching provider
+// later doesn't require a code change — see README "Deploying" section.
+const TILE_URL = process.env.NEXT_PUBLIC_TILE_URL || "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+const TILE_ATTRIBUTION =
+  process.env.NEXT_PUBLIC_TILE_ATTRIBUTION ||
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
 // Frames the map around whatever points are currently present. Runs as an effect
 // (rather than just setting MapContainer's initial center/zoom) so it re-frames when
 // the result set changes, e.g. after a search or a page of pagination.
@@ -70,10 +79,7 @@ export default function EstablishmentMapInner({ points, heightClassName = "h-[50
       scrollWheelZoom
       className={`w-full ${heightClassName} rounded-lg border border-gray-200`}
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
       <FitToPoints points={points} />
       {points.map((point) => (
         <Marker
