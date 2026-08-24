@@ -10,9 +10,7 @@ export function Header() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75l1.5 1.5 4.5-4.5M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" />
             </svg>
           </span>
-          <span>
-            UK Food Hygiene Ratings
-          </span>
+          <span>Should I Eat Here</span>
         </Link>
         <a
           href="https://ratings.food.gov.uk"

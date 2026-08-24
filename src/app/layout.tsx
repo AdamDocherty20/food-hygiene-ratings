@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-const SITE_TITLE = "UK Food Hygiene Ratings";
+const SITE_TITLE = "Should I Eat Here";
 const SITE_DESCRIPTION =
-  "Search UK Food Standards Agency food hygiene ratings (FHRS/FHIS) by business name, postcode, or type — with map results and the latest inspection rating for every establishment.";
+  "Should I Eat Here — search UK Food Standards Agency food hygiene ratings (FHRS/FHIS) by business name, postcode, or type — with map results and the latest inspection rating for every establishment.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
