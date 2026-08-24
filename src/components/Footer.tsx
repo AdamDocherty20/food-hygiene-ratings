@@ -36,6 +36,17 @@ export function Footer() {
           </a>
           .
         </p>
+        <p className="mt-4 text-xs text-gray-400">
+          Created by{" "}
+          <a
+            href="https://adamdocherty.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-indigo-600 underline-offset-2 hover:underline"
+          >
+            adamdocherty.com
+          </a>
+        </p>
       </div>
     </footer>
   );
