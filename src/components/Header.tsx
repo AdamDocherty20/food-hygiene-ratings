@@ -1,15 +1,33 @@
 import Link from "next/link";
 
+// The same 20x20 star used in RatingBadge's star rows — reused here so the logo reads as
+// "the rating star, found via search", tying the mark directly to what the site does.
+const STAR_PATH =
+  "M10 15.27L16.18 19l-1.64-7.03L20 7.24l-7.19-.61L10 0 7.19 6.63 0 7.24l5.46 4.73L3.82 19z";
+
+function BrandMark() {
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-blue-600 text-white shadow-sm">
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607Z"
+        />
+        <path d={STAR_PATH} fill="#fbbf24" transform="translate(5.5,5.675) scale(0.35)" />
+      </svg>
+    </span>
+  );
+}
+
 export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
         <Link href="/" className="flex items-center gap-2 text-lg font-bold tracking-tight text-gray-900">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white">
-            <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75l1.5 1.5 4.5-4.5M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z" />
-            </svg>
-          </span>
+          <BrandMark />
           <span>Should I Eat Here</span>
         </Link>
         <a
