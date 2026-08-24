@@ -16,7 +16,7 @@ const EstablishmentMapInner = dynamic(() => import("@/components/EstablishmentMa
   ssr: false,
   loading: () => (
     <div
-      className={`flex w-full ${DEFAULT_HEIGHT_CLASSNAME} items-center justify-center rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-500`}
+      className={`flex w-full ${DEFAULT_HEIGHT_CLASSNAME} items-center justify-center rounded-xl border border-gray-200 bg-gray-100 text-sm text-gray-500 shadow-sm`}
     >
       Loading map…
     </div>

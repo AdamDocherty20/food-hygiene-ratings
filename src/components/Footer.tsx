@@ -1,6 +1,6 @@
 export function Footer() {
   return (
-    <footer className="border-t border-gray-200 bg-white py-6">
+    <footer className="border-t border-gray-200 bg-white py-8">
       <div className="mx-auto max-w-5xl px-4 text-center text-sm text-gray-500">
         <p>
           Food hygiene rating data provided by the{" "}
@@ -8,7 +8,7 @@ export function Footer() {
             href="https://ratings.food.gov.uk"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-gray-700"
+            className="font-medium text-indigo-600 underline-offset-2 hover:underline"
           >
             Food Standards Agency
           </a>
@@ -17,13 +17,13 @@ export function Footer() {
             href="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
             target="_blank"
             rel="noopener noreferrer"
-            className="underline hover:text-gray-700"
+            className="font-medium text-indigo-600 underline-offset-2 hover:underline"
           >
             Open Government Licence v3.0
           </a>
           .
         </p>
-        <p className="mt-1 text-xs text-gray-400">
+        <p className="mx-auto mt-2 max-w-2xl text-xs text-gray-400">
           This is an independent, unofficial tool and is not affiliated with or endorsed by the Food Standards
           Agency. For the official ratings, visit{" "}
           <a

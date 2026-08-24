@@ -77,7 +77,7 @@ export default function EstablishmentMapInner({ points, heightClassName = "h-[50
       center={initialCenter}
       zoom={points.length > 0 ? SINGLE_POINT_ZOOM : UK_DEFAULT_ZOOM}
       scrollWheelZoom
-      className={`w-full ${heightClassName} rounded-lg border border-gray-200`}
+      className={`w-full ${heightClassName} rounded-xl border border-gray-200 shadow-sm`}
     >
       <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
       <FitToPoints points={points} />
