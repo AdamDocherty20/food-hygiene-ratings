@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, fetchEstablishment } from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
+import { NearbyEstablishments } from "@/components/NearbyEstablishments";
 import { RatingBadge } from "@/components/RatingBadge";
 import { formatAddress } from "@/lib/format";
 import { establishmentPath, parseFhrsIdParam } from "@/lib/slug";
@@ -168,6 +169,14 @@ export function EstablishmentDetailClient() {
         <div className="mt-6">
           <EstablishmentMap points={mapPoints} heightClassName="h-[350px]" />
         </div>
+      )}
+
+      {establishment.latitude !== null && establishment.longitude !== null && (
+        <NearbyEstablishments
+          fhrsId={establishment.fhrsId}
+          lat={establishment.latitude}
+          lng={establishment.longitude}
+        />
       )}
     </div>
   );
