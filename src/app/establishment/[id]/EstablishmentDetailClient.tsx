@@ -7,7 +7,8 @@ import { ApiError, fetchEstablishment } from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { NearbyEstablishments } from "@/components/NearbyEstablishments";
 import { RatingBadge } from "@/components/RatingBadge";
-import { formatAddress } from "@/lib/format";
+import { ShareButton } from "@/components/ShareButton";
+import { formatAddress, humanizeStatus } from "@/lib/format";
 import { establishmentPath, parseFhrsIdParam } from "@/lib/slug";
 import type { Establishment } from "@/lib/types";
 
@@ -124,6 +125,11 @@ export function EstablishmentDetailClient() {
 
   const establishment = requestState.data;
 
+  const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
+  const shareText = `${establishment.businessName} — food hygiene rating: ${
+    isNumericFhrs ? `${establishment.ratingValue}/5` : humanizeStatus(establishment.ratingValue)
+  }`;
+
   const mapPoints: MapPoint[] =
     establishment.latitude !== null && establishment.longitude !== null
       ? [
@@ -139,7 +145,10 @@ export function EstablishmentDetailClient() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <BackLink />
+      <div className="flex items-center justify-between gap-4">
+        <BackLink />
+        <ShareButton title={establishment.businessName} text={shareText} />
+      </div>
 
       <div
         className={`mt-4 rounded-xl border border-l-4 border-gray-200 bg-white p-6 shadow-sm ${ratingAccentClasses(establishment.schemeType, establishment.ratingValue)}`}
