@@ -7,7 +7,7 @@ import { ApiError, fetchBusinessTypes, searchEstablishments, searchNearby } from
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
 import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
-import { formatAddress, formatDate } from "@/lib/format";
+import { formatAddress } from "@/lib/format";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
@@ -74,12 +74,7 @@ type SearchRequestState =
   | { key: string; status: "success"; data: ResultItem[]; pagination: PaginationMeta }
   | { key: string; status: "error"; message: string };
 
-interface SearchPageContentProps {
-  /** ISO timestamp of the most recent FSA data sync, or null if it couldn't be determined. */
-  lastSyncedAt: string | null;
-}
-
-export function SearchPageContent({ lastSyncedAt }: SearchPageContentProps) {
+export function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -259,8 +254,6 @@ export function SearchPageContent({ lastSyncedAt }: SearchPageContentProps) {
     router.push("/");
   }
 
-  const formattedSyncDate = formatDate(lastSyncedAt);
-
   const isIdle = requestState.status === "idle";
   const isLoading = requestState.status === "loading";
   const results = requestState.status === "success" ? requestState.data : [];
@@ -281,7 +274,7 @@ export function SearchPageContent({ lastSyncedAt }: SearchPageContentProps) {
           </p>
           <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-indigo-100">
             <HeroStat label="Official FSA data" />
-            <HeroStat label={formattedSyncDate ? `Data updated ${formattedSyncDate}` : "Updated regularly"} />
+            <HeroStat label="Updated regularly" />
             <HeroStat label="600,000+ UK establishments" />
           </div>
         </div>
