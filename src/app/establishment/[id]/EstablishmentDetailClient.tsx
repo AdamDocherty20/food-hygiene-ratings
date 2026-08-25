@@ -10,7 +10,7 @@ import { RatingBadge } from "@/components/RatingBadge";
 import { ShareButton } from "@/components/ShareButton";
 import { formatAddress, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { establishmentPath, parseFhrsIdParam } from "@/lib/slug";
-import type { Establishment, EstablishmentDetailResponse } from "@/lib/types";
+import type { Establishment, EstablishmentDetailResponse, FsaDetail } from "@/lib/types";
 
 type RequestState =
   | { fhrsId: string; status: "loading" }
@@ -188,6 +188,82 @@ function OtherLocationsSection({ locations }: { locations: EstablishmentDetailRe
   );
 }
 
+// The FHRS component score breakdown, fetched live from the FSA (not in the bulk feed
+// scripts/sync.ts imports, so it isn't in our own database). Counterintuitively, lower is
+// better on all three — 0 is the best possible score — so we spell that out rather than
+// letting a "5" read as a good number the way the overall rating does.
+function ScoreBreakdown({ scores }: { scores: NonNullable<FsaDetail["scores"]> }) {
+  const rows: { label: string; value: number }[] = [
+    { label: "Hygienic food handling", value: scores.hygiene },
+    { label: "Cleanliness of facilities", value: scores.structural },
+    { label: "Confidence in management", value: scores.confidenceInManagement },
+  ];
+
+  return (
+    <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <h2 className="text-sm font-semibold text-gray-900">Inspection score breakdown</h2>
+      <p className="mt-1 text-xs text-gray-500">
+        Lower scores are better — 0 is the best possible score on each measure.
+      </p>
+      <dl className="mt-4 space-y-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex items-center justify-between gap-4 text-sm">
+            <dt className="text-gray-600">{row.label}</dt>
+            <dd className="font-medium text-gray-900">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+// FSA-supplied extras that aren't in our own database: the business's written response to
+// its inspection (if any) and a phone number. Renders nothing for whichever fields are
+// missing, and the whole section is skipped by the caller if fsaDetail is null altogether
+// (e.g. the FSA's live API timed out).
+function FsaExtrasSection({ fsaDetail }: { fsaDetail: FsaDetail }) {
+  if (!fsaDetail.phone && !fsaDetail.rightToReply && !fsaDetail.scores) return null;
+
+  return (
+    <div className="mt-6 flex flex-col gap-6">
+      {(fsaDetail.phone || fsaDetail.rightToReply) && (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          {fsaDetail.phone && (
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Phone</h2>
+              <a href={`tel:${fsaDetail.phone}`} className="mt-1 inline-block text-sm text-indigo-600 hover:underline">
+                {fsaDetail.phone}
+              </a>
+            </div>
+          )}
+          {fsaDetail.phone && fsaDetail.rightToReply && <hr className="my-4 border-gray-100" />}
+          {fsaDetail.rightToReply && (
+            <div>
+              <h2 className="text-sm font-semibold text-gray-900">Business&apos;s response</h2>
+              <p className="mt-1 whitespace-pre-line text-sm text-gray-700">{fsaDetail.rightToReply}</p>
+            </div>
+          )}
+        </div>
+      )}
+      {fsaDetail.scores && <ScoreBreakdown scores={fsaDetail.scores} />}
+    </div>
+  );
+}
+
+// A heads-up that a re-inspection has already taken place but the FSA hasn't published the
+// new rating yet — the rating shown below is the last published one, not necessarily the
+// current one.
+function NewRatingPendingBanner() {
+  return (
+    <p className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+      <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      A new inspection has taken place — this rating may be out of date until the FSA publishes the result.
+    </p>
+  );
+}
+
 export function EstablishmentDetailClient() {
   const router = useRouter();
   // The route segment is "[fhrsId]-[slug]" (e.g. "1954128-nosh") or, for old links, just
@@ -263,7 +339,7 @@ export function EstablishmentDetailClient() {
     );
   }
 
-  const { data: establishment, localAuthorityAverageRating, otherLocations, ratingHistory } = requestState.data;
+  const { data: establishment, localAuthorityAverageRating, otherLocations, ratingHistory, fsaDetail } = requestState.data;
 
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
   const shareText = `${establishment.businessName} — food hygiene rating: ${
@@ -326,6 +402,7 @@ export function EstablishmentDetailClient() {
                 localAuthorityName={establishment.localAuthorityName}
               />
             )}
+            {fsaDetail?.newRatingPending && <NewRatingPendingBanner />}
           </div>
         </div>
 
@@ -352,6 +429,7 @@ export function EstablishmentDetailClient() {
       )}
 
       <RatingHistorySection history={ratingHistory} />
+      {fsaDetail && <FsaExtrasSection fsaDetail={fsaDetail} />}
       <OtherLocationsSection locations={otherLocations} />
 
       {establishment.latitude !== null && establishment.longitude !== null && (

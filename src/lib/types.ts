@@ -46,12 +46,29 @@ export interface RatingHistoryEntry {
   recordedAt: string;
 }
 
+/** FHRS component score breakdown — lower is better for each. See src/lib/fsa-api.ts. */
+export interface FsaScores {
+  hygiene: number;
+  structural: number;
+  confidenceInManagement: number;
+}
+
+/** Extra fields fetched live from the FSA's per-establishment API — see src/lib/fsa-api.ts. */
+export interface FsaDetail {
+  phone: string | null;
+  rightToReply: string | null;
+  newRatingPending: boolean;
+  scores: FsaScores | null;
+}
+
 export interface EstablishmentDetailResponse {
   data: Establishment;
   /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
   localAuthorityAverageRating: number | null;
   otherLocations: OtherLocation[];
   ratingHistory: RatingHistoryEntry[];
+  /** Null if the FSA's live API call failed or timed out — not an error, just less info. */
+  fsaDetail: FsaDetail | null;
 }
 
 export interface PaginationMeta {

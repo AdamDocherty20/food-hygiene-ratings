@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError } from "@/lib/api-response";
+import { fetchFsaEstablishmentDetail } from "@/lib/fsa-api";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
@@ -81,6 +82,10 @@ async function getRatingHistory(fhrsId: number) {
  *   - localAuthorityAverageRating: average FHRS rating for the same local authority
  *     (null for FHIS establishments, or if there's no comparable FHRS data)
  *   - otherLocations: other active branches sharing the same business name
+ *   - ratingHistory: rating changes we've observed over time, newest first
+ *   - fsaDetail: extra fields (phone, right-to-reply, score breakdown, new-rating-pending)
+ *     fetched live from the FSA's per-establishment API — null if that call fails, since
+ *     it's not in our own database and shouldn't block the rest of the page
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const limited = enforceRateLimit(request);
@@ -104,13 +109,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_PATTERN.test(establishment.ratingValue);
 
-    const [localAuthorityAverageRating, otherLocations, ratingHistory] = await Promise.all([
+    const [localAuthorityAverageRating, otherLocations, ratingHistory, fsaDetail] = await Promise.all([
       isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
       getOtherLocations(establishment.businessName, establishment.fhrsId),
       getRatingHistory(establishment.fhrsId),
+      fetchFsaEstablishmentDetail(establishment.fhrsId),
     ]);
 
-    return NextResponse.json({ data: establishment, localAuthorityAverageRating, otherLocations, ratingHistory });
+    return NextResponse.json({ data: establishment, localAuthorityAverageRating, otherLocations, ratingHistory, fsaDetail });
   } catch (err) {
     console.error(`GET /api/establishments/${id} failed:`, err);
     return jsonError(500, "Internal server error while fetching establishment.");
