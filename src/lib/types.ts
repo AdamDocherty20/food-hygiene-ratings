@@ -28,6 +28,32 @@ export interface EstablishmentWithDistance extends Establishment {
   distanceMiles: number;
 }
 
+/** Another active branch of the same chain — see GET /api/establishments/[id]. */
+export interface OtherLocation {
+  fhrsId: number;
+  businessName: string;
+  addressLine1: string | null;
+  postcode: string | null;
+  ratingValue: string;
+  schemeType: string;
+  ratingDate: string | null;
+}
+
+export interface RatingHistoryEntry {
+  ratingValue: string;
+  schemeType: string;
+  ratingDate: string | null;
+  recordedAt: string;
+}
+
+export interface EstablishmentDetailResponse {
+  data: Establishment;
+  /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
+  localAuthorityAverageRating: number | null;
+  otherLocations: OtherLocation[];
+  ratingHistory: RatingHistoryEntry[];
+}
+
 export interface PaginationMeta {
   page: number;
   pageSize: number;

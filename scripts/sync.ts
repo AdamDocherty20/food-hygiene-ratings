@@ -111,11 +111,41 @@ function rowTuple(row: MappedRow, syncRunAt: Date) {
   return Prisma.sql`(${row.fhrsId}, ${row.localAuthorityBusinessId}, ${row.businessName}, ${row.businessType}, ${row.businessTypeId}, ${row.addressLine1}, ${row.addressLine2}, ${row.addressLine3}, ${row.addressLine4}, ${row.postcode}, ${row.ratingValue}, ${row.ratingKey}, ${row.ratingDate}, ${row.schemeType}, ${row.latitude}, ${row.longitude}, ${row.localAuthorityName}, ${row.localAuthorityCode}, true, ${syncRunAt}, ${syncRunAt})`;
 }
 
+interface PriorRating {
+  ratingValue: string;
+  ratingDate: Date | null;
+}
+
+function ratingChanged(prior: PriorRating | undefined, row: MappedRow): boolean {
+  if (!prior) return true; // brand new establishment — seed its history baseline
+  if (prior.ratingValue !== row.ratingValue) return true;
+  const priorTime = prior.ratingDate?.getTime() ?? null;
+  const nextTime = row.ratingDate?.getTime() ?? null;
+  return priorTime !== nextTime; // a new ratingDate means a re-inspection occurred
+}
+
 // Bulk INSERT .. ON CONFLICT DO UPDATE in a single round trip per batch, matched on the
 // FSA's stable fhrsId. `xmax = 0` on the returned row distinguishes a fresh insert from
 // an update of an existing row, so we can report both counts without a second query.
-async function upsertBatch(batch: MappedRow[], syncRunAt: Date): Promise<{ added: number; updated: number }> {
-  if (batch.length === 0) return { added: 0, updated: 0 };
+//
+// Also detects rating changes (including first-seen establishments) by comparing against
+// a snapshot of prior ratingValue/ratingDate taken just before the upsert, and writes one
+// RatingHistory row per change — this is what powers the "rating history" timeline on the
+// establishment detail page.
+async function upsertBatch(
+  batch: MappedRow[],
+  syncRunAt: Date,
+): Promise<{ added: number; updated: number; historyRows: number }> {
+  if (batch.length === 0) return { added: 0, updated: 0, historyRows: 0 };
+
+  const fhrsIds = batch.map((row) => row.fhrsId);
+  const priorRows = await prisma.establishment.findMany({
+    where: { fhrsId: { in: fhrsIds } },
+    select: { fhrsId: true, ratingValue: true, ratingDate: true },
+  });
+  const priorByFhrsId = new Map<number, PriorRating>(
+    priorRows.map((row) => [row.fhrsId, { ratingValue: row.ratingValue, ratingDate: row.ratingDate }]),
+  );
 
   const result = await prisma.$queryRaw<{ isNew: boolean }[]>`
     INSERT INTO "Establishment" (
@@ -152,7 +182,21 @@ async function upsertBatch(batch: MappedRow[], syncRunAt: Date): Promise<{ added
   `;
 
   const added = result.filter((row) => row.isNew).length;
-  return { added, updated: result.length - added };
+
+  const changedRows = batch.filter((row) => ratingChanged(priorByFhrsId.get(row.fhrsId), row));
+  if (changedRows.length > 0) {
+    await prisma.ratingHistory.createMany({
+      data: changedRows.map((row) => ({
+        fhrsId: row.fhrsId,
+        ratingValue: row.ratingValue,
+        schemeType: row.schemeType,
+        ratingDate: row.ratingDate,
+        recordedAt: syncRunAt,
+      })),
+    });
+  }
+
+  return { added, updated: result.length - added, historyRows: changedRows.length };
 }
 
 async function main() {
@@ -182,6 +226,7 @@ async function main() {
   let skippedRows = 0;
   let added = 0;
   let updated = 0;
+  let historyRows = 0;
   let batch: MappedRow[] = [];
 
   for await (const record of parser as AsyncIterable<CsvRecord>) {
@@ -197,6 +242,7 @@ async function main() {
       const result = await upsertBatch(batch, syncRunAt);
       added += result.added;
       updated += result.updated;
+      historyRows += result.historyRows;
       batch = [];
     }
 
@@ -209,6 +255,7 @@ async function main() {
     const result = await upsertBatch(batch, syncRunAt);
     added += result.added;
     updated += result.updated;
+    historyRows += result.historyRows;
   }
 
   console.log("Marking establishments no longer present in the feed as inactive...");
@@ -222,6 +269,7 @@ async function main() {
   console.log(`  Rows skipped (bad data): ${skippedRows.toLocaleString()}`);
   console.log(`  New establishments:      ${added.toLocaleString()}`);
   console.log(`  Updated establishments:  ${updated.toLocaleString()}`);
+  console.log(`  Rating history rows:     ${historyRows.toLocaleString()}`);
   console.log(`  Newly marked inactive:   ${deactivated.count.toLocaleString()}`);
 }
 

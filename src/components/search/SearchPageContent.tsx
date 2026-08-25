@@ -58,6 +58,7 @@ function hasActiveFilters(searchParams: URLSearchParams): boolean {
     searchParams.get("name")?.trim() ||
       searchParams.get("postcode")?.trim() ||
       searchParams.get("businessTypeId") ||
+      searchParams.get("localAuthorityName")?.trim() ||
       isNearbySearch(searchParams),
   );
 }
@@ -166,12 +167,23 @@ export function SearchPageContent({ lastSyncedAt }: SearchPageContentProps) {
     if (name.trim()) params.set("name", name.trim());
     if (postcode.trim()) params.set("postcode", postcode.trim());
     if (businessTypeId) params.set("businessTypeId", businessTypeId);
-    // Carry over the rating filter/sort refinements across a fresh text search, so
-    // tweaking the name/postcode/type fields doesn't silently discard them.
+    // Carry over the rating filter/sort/local-authority refinements across a fresh text
+    // search, so tweaking the name/postcode/type fields doesn't silently discard them —
+    // e.g. arriving here via the "local authority" link on an establishment page and then
+    // typing a name shouldn't drop back to a nationwide search.
     const ratingValue = searchParams.get("ratingValue");
     const sort = searchParams.get("sort");
+    const localAuthorityName = searchParams.get("localAuthorityName");
     if (ratingValue) params.set("ratingValue", ratingValue);
     if (sort && sort !== DEFAULT_SORT) params.set("sort", sort);
+    if (localAuthorityName) params.set("localAuthorityName", localAuthorityName);
+    params.set("page", "1");
+    router.push(`/?${params.toString()}`);
+  }
+
+  function clearLocalAuthority() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("localAuthorityName");
     params.set("page", "1");
     router.push(`/?${params.toString()}`);
   }
@@ -428,6 +440,17 @@ export function SearchPageContent({ lastSyncedAt }: SearchPageContentProps) {
                     </button>
                   ))}
                 </div>
+
+                {searchParams.get("localAuthorityName") && (
+                  <button
+                    type="button"
+                    onClick={clearLocalAuthority}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                  >
+                    In {searchParams.get("localAuthorityName")}
+                    <span aria-hidden>✕</span>
+                  </button>
+                )}
               </div>
             )}
 

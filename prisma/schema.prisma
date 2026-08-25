@@ -57,3 +57,25 @@ model Establishment {
   @@index([postcode])
   @@index([latitude, longitude])
 }
+
+// One row per detected rating change (including the very first rating an establishment
+// is seen with), written by the sync script whenever a re-run's ratingValue/ratingDate
+// differs from what's currently stored. Deliberately not a foreign key to Establishment —
+// establishments are soft-deleted (isActive), never removed, so there's no cascade to
+// worry about, and keeping this table decoupled means the bulk upsert in sync.ts doesn't
+// need to join against it.
+model RatingHistory {
+  id Int @id @default(autoincrement())
+
+  fhrsId Int
+
+  ratingValue String
+  schemeType  String
+  ratingDate  DateTime?
+
+  // When *we* observed this rating (i.e. sync run time), not the FSA's inspection date —
+  // ratingDate above is the inspection date and can be null/backdated.
+  recordedAt DateTime @default(now())
+
+  @@index([fhrsId, recordedAt])
+}
