@@ -1,8 +1,15 @@
+import Link from "next/link";
+
 export function Footer() {
   return (
     <footer className="border-t border-gray-200 bg-white py-8">
       <div className="mx-auto max-w-5xl px-4 text-center text-sm text-gray-500">
         <p>
+          <Link href="/about" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+            About &amp; FAQ
+          </Link>
+        </p>
+        <p className="mt-2">
           Food hygiene rating data provided by the{" "}
           <a
             href="https://ratings.food.gov.uk"
