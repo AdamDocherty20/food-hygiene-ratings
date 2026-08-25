@@ -1,12 +1,15 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import L from "leaflet";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { MapContainer, Marker, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-cluster";
 
 // react-leaflet's default marker icon references image paths that don't resolve
 // correctly once bundled — point it at the same version's icons on a CDN instead of
@@ -108,6 +111,42 @@ function FitToPoints({ points, programmaticMoveRef }: { points: MapPoint[]; prog
   return null;
 }
 
+// Leaflet measures its container once at creation time and doesn't notice later resizes
+// on its own. The mobile List/Map toggle mounts this map inside a display:none wrapper
+// (so it stays alive and doesn't refetch tiles when switching back), which means it
+// initializes at 0x0 and — without this — never lays out its tiles or markers even once
+// that wrapper becomes visible. A ResizeObserver on the container catches exactly that
+// transition (and any other future collapsible-layout case) and tells Leaflet to
+// re-measure and re-frame itself.
+function InvalidateSizeOnVisible({ points }: { points: MapPoint[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    let lastWasEmpty = container.clientWidth === 0 || container.clientHeight === 0;
+
+    const observer = new ResizeObserver(() => {
+      const isEmpty = container.clientWidth === 0 || container.clientHeight === 0;
+      map.invalidateSize();
+      // Only re-frame if we're coming back from a zero-size container — a genuine resize
+      // of an already-visible map shouldn't yank the visitor's current pan/zoom around.
+      if (lastWasEmpty && !isEmpty) {
+        if (points.length === 1) {
+          map.setView([points[0].lat, points[0].lng], SINGLE_POINT_ZOOM);
+        } else if (points.length > 1) {
+          const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng] as [number, number]));
+          map.fitBounds(bounds, { padding: [30, 30] });
+        }
+      }
+      lastWasEmpty = isEmpty;
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [map, points]);
+
+  return null;
+}
+
 // Converts a map viewport into a { lat, lng, radiusMiles } query wide enough to cover
 // the whole visible area — radius is the distance from the center to the furthest
 // visible corner, so nothing currently on screen falls outside the new search radius.
@@ -183,21 +222,27 @@ export default function EstablishmentMapInner({
       className={`relative w-full ${heightClassName} rounded-xl border border-gray-200 shadow-sm`}
     >
       <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+      <InvalidateSizeOnVisible points={points} />
       <FitToPoints points={points} programmaticMoveRef={programmaticMoveRef} />
       <SearchThisAreaControl programmaticMoveRef={programmaticMoveRef} onSearchThisArea={onSearchThisArea} />
-      {points.map((point) => (
-        <Marker
-          key={point.id}
-          position={[point.lat, point.lng]}
-          eventHandlers={{
-            click: () => router.push(point.href),
-          }}
-        >
-          <Tooltip direction="top">
-            <Link href={point.href}>{point.label}</Link>
-          </Tooltip>
-        </Marker>
-      ))}
+      {/* Groups nearby pins into a single "12" bubble that splits apart on zoom — without
+          this, wide-radius/zoomed-out views (especially after "Search this area") turn
+          into an unreadable pile of overlapping markers in dense town centres. */}
+      <MarkerClusterGroup chunkedLoading showCoverageOnHover={false} maxClusterRadius={50}>
+        {points.map((point) => (
+          <Marker
+            key={point.id}
+            position={[point.lat, point.lng]}
+            eventHandlers={{
+              click: () => router.push(point.href),
+            }}
+          >
+            <Tooltip direction="top">
+              <Link href={point.href}>{point.label}</Link>
+            </Tooltip>
+          </Marker>
+        ))}
+      </MarkerClusterGroup>
     </MapContainer>
   );
 }

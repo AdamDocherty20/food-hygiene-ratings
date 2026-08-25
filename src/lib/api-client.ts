@@ -2,6 +2,7 @@ import type {
   ApiErrorResponse,
   BusinessTypesResponse,
   EstablishmentDetailResponse,
+  NearbyMapPointsResponse,
   NearbyResponse,
   SearchResponse,
 } from "@/lib/types";
@@ -38,6 +39,10 @@ export function searchEstablishments(params: URLSearchParams): Promise<SearchRes
 
 export function searchNearby(params: URLSearchParams): Promise<NearbyResponse> {
   return getJson<NearbyResponse>(`/api/establishments/nearby?${params.toString()}`);
+}
+
+export function searchNearbyMapPoints(params: URLSearchParams): Promise<NearbyMapPointsResponse> {
+  return getJson<NearbyMapPointsResponse>(`/api/establishments/nearby/map?${params.toString()}`);
 }
 
 export function fetchBusinessTypes(): Promise<BusinessTypesResponse> {

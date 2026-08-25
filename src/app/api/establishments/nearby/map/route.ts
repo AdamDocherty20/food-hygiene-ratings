@@ -2,60 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { jsonError } from "@/lib/api-response";
 import { boundingBoxDelta, distanceMilesSql, parseRequiredCoordinate, parseRadiusMiles } from "@/lib/geo";
-import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
-interface EstablishmentWithDistance {
+// Deliberately much higher than the paginated /nearby endpoint's pageSize (max 100) —
+// this route only returns the handful of fields a map pin needs, so it's cheap to send
+// more of them. Lets the map show every establishment in view (e.g. after "Search this
+// area" widens the radius) instead of being capped to a single page of results.
+const MAP_POINT_LIMIT = 500;
+
+interface MapPointRow {
   id: number;
   fhrsId: number;
-  localAuthorityBusinessId: string;
   businessName: string;
-  businessType: string;
-  businessTypeId: number;
-  addressLine1: string | null;
-  addressLine2: string | null;
-  addressLine3: string | null;
-  addressLine4: string | null;
-  postcode: string | null;
-  ratingValue: string;
-  ratingKey: string;
-  ratingDate: Date | null;
-  schemeType: string;
-  latitude: number | null;
-  longitude: number | null;
-  localAuthorityName: string;
-  localAuthorityCode: string;
-  isActive: boolean;
-  lastSeenAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-  distanceMiles: number;
+  latitude: number;
+  longitude: number;
 }
 
 /**
- * GET /api/establishments/nearby
+ * GET /api/establishments/nearby/map
  *
  * Query params:
- *   - lat, lng       (required, decimal degrees)
- *   - radiusMiles    (optional, default 1, capped at 10)
- *   - page, pageSize (optional, same pagination as /search)
+ *   - lat, lng    (required, decimal degrees)
+ *   - radiusMiles (optional, default 1, capped at 10 — same as /nearby)
  *
- * Only considers establishments with non-null latitude/longitude and isActive: true.
- * Distance is computed with the Haversine formula in raw SQL (no PostGIS needed) and
- * results are sorted nearest-first, with each result annotated with distanceMiles.
+ * A lighter-weight sibling of /api/establishments/nearby, for driving the map rather
+ * than the results list: no pagination, no address/rating fields, just enough to place
+ * and label a pin — but up to MAP_POINT_LIMIT of them instead of one page's worth.
  */
 export async function GET(request: NextRequest) {
   const limited = enforceRateLimit(request);
   if (limited) return limited;
 
   const { searchParams } = new URL(request.url);
-
-  const pagination = parsePagination(searchParams);
-  if (!pagination.ok) {
-    return jsonError(400, pagination.error);
-  }
-  const { page, pageSize, skip, take } = pagination.value;
 
   const latResult = parseRequiredCoordinate(searchParams.get("lat"), "lat", -90, 90);
   if (!latResult.ok) return jsonError(400, latResult.error);
@@ -74,7 +53,7 @@ export async function GET(request: NextRequest) {
   const distanceExpr = distanceMilesSql(lat, lng);
 
   const candidates = Prisma.sql`
-    SELECT *, ${distanceExpr} AS "distanceMiles"
+    SELECT "id", "fhrsId", "businessName", "latitude", "longitude", ${distanceExpr} AS "distanceMiles"
     FROM "Establishment"
     WHERE "isActive" = true
       AND "latitude" IS NOT NULL
@@ -91,21 +70,21 @@ export async function GET(request: NextRequest) {
     `;
     const total = Number(countResult[0]?.total ?? 0);
 
-    const results = await prisma.$queryRaw<EstablishmentWithDistance[]>`
-      SELECT *
+    const results = await prisma.$queryRaw<MapPointRow[]>`
+      SELECT "id", "fhrsId", "businessName", "latitude", "longitude"
       FROM (${candidates}) "nearby"
       WHERE "nearby"."distanceMiles" <= ${radiusMiles}
       ORDER BY "nearby"."distanceMiles" ASC
-      LIMIT ${take} OFFSET ${skip}
+      LIMIT ${MAP_POINT_LIMIT}
     `;
 
     return NextResponse.json({
       data: results,
-      pagination: buildPaginationMeta(page, pageSize, total),
+      truncated: total > MAP_POINT_LIMIT,
       query: { lat, lng, radiusMiles },
     });
   } catch (err) {
-    console.error("GET /api/establishments/nearby failed:", err);
-    return jsonError(500, "Internal server error while searching nearby establishments.");
+    console.error("GET /api/establishments/nearby/map failed:", err);
+    return jsonError(500, "Internal server error while fetching map points.");
   }
 }

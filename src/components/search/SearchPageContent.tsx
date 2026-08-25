@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { ApiError, fetchBusinessTypes, searchEstablishments, searchNearby } from "@/lib/api-client";
+import { useEffect, useRef, useState } from "react";
+import {
+  ApiError,
+  fetchBusinessTypes,
+  searchEstablishments,
+  searchNearby,
+  searchNearbyMapPoints,
+} from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint, type SearchThisAreaQuery } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
 import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
@@ -16,6 +22,9 @@ const DEFAULT_RADIUS_MILES = "2";
 // Matches the server-side cap in /api/establishments/nearby — radius values above this
 // get silently clamped down there anyway, so there's no point asking for more.
 const MAX_RADIUS_MILES = 10;
+// Matches MAP_POINT_LIMIT in /api/establishments/nearby/map — used only for the
+// "showing nearest N" caption, not to actually cap anything client-side.
+const MAP_POINT_LIMIT = 500;
 const DEFAULT_SORT = "name";
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: "name", label: "Name (A-Z)" },
@@ -130,6 +139,30 @@ export function SearchPageContent() {
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
+  // Small + medium screens stack the list above the map, so a wide nearby search means a
+  // lot of scrolling to actually see the map — this toggle lets a visitor swap to a
+  // full-width map view instead, without affecting the side-by-side desktop layout.
+  const [mobileView, setMobileView] = useState<"list" | "map">("list");
+
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // "/" jumps straight into the business name field, the same shortcut GitHub/Gmail/etc
+  // use for "focus search" — skipped while already typing in a field (so it doesn't
+  // hijack a literal "/" character in, say, a postcode-adjacent field) or holding a
+  // modifier key (so browser/OS shortcuts like Cmd+/ still work normally).
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target?.isContentEditable) return;
+      event.preventDefault();
+      nameInputRef.current?.focus();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   useEffect(() => {
     if (!hasFilters) return;
 
@@ -169,6 +202,53 @@ export function SearchPageContent() {
       cancelled = true;
     };
   }, []);
+
+  // The results list is capped to one page (20) at a time, which is fine for a list but
+  // means a wide-radius nearby search (especially after "Search this area") would only
+  // ever show 20 pins even when hundreds of establishments are in view. This fetches a
+  // separate, uncapped-ish (up to MAP_POINT_LIMIT) set of pins for the map alone, keyed
+  // on lat/lng/radius only — so paging through the list doesn't re-fetch the whole map.
+  const nearbyMapKey = isNearbyMode
+    ? `${searchParams.get("lat")}|${searchParams.get("lng")}|${searchParams.get("radiusMiles") ?? DEFAULT_RADIUS_MILES}`
+    : null;
+  const [wideMapPoints, setWideMapPoints] = useState<{ key: string; points: MapPoint[]; truncated: boolean } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!nearbyMapKey) return;
+
+    let cancelled = false;
+    const params = new URLSearchParams();
+    params.set("lat", searchParams.get("lat")!);
+    params.set("lng", searchParams.get("lng")!);
+    params.set("radiusMiles", searchParams.get("radiusMiles") ?? DEFAULT_RADIUS_MILES);
+
+    searchNearbyMapPoints(params)
+      .then((response) => {
+        if (cancelled) return;
+        setWideMapPoints({
+          key: nearbyMapKey,
+          truncated: response.truncated,
+          points: response.data.map((row) => ({
+            id: row.id,
+            lat: row.latitude,
+            lng: row.longitude,
+            label: row.businessName,
+            href: establishmentPath(row.fhrsId, row.businessName),
+          })),
+        });
+      })
+      .catch(() => {
+        // Non-critical: the map just falls back to the current page's results below.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // searchParams is read via .get() above, but nearbyMapKey already captures every value that matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nearbyMapKey]);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -285,7 +365,9 @@ export function SearchPageContent() {
   const results = requestState.status === "success" ? requestState.data : [];
   const pagination = requestState.status === "success" ? requestState.pagination : null;
   const error = requestState.status === "error" ? requestState.message : null;
-  const mapPoints = toMapPoints(results);
+  const hasWideMapPoints = isNearbyMode && wideMapPoints !== null && wideMapPoints.key === nearbyMapKey;
+  const mapPoints = hasWideMapPoints ? wideMapPoints!.points : toMapPoints(results);
+  const mapPointsTruncated = hasWideMapPoints && wideMapPoints!.truncated;
 
   return (
     <div>
@@ -317,6 +399,7 @@ export function SearchPageContent() {
             </label>
             <input
               id="name"
+              ref={nameInputRef}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -407,8 +490,31 @@ export function SearchPageContent() {
           {locationError && <p className="text-sm text-red-600">{locationError}</p>}
         </div>
 
+        {!isIdle && (
+          <div className="mb-4 inline-flex rounded-md border border-gray-300 bg-white p-0.5 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setMobileView("list")}
+              className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
+                mobileView === "list" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileView("map")}
+              className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
+                mobileView === "map" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              Map
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div>
+          <div className={mobileView === "map" ? "hidden lg:block" : ""}>
             {error && (
               <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
                 {error}
@@ -493,7 +599,7 @@ export function SearchPageContent() {
                 </div>
               </div>
             ) : isLoading ? (
-              <p className="text-sm text-gray-500">Loading results…</p>
+              <ResultsSkeleton />
             ) : results.length === 0 ? (
               <p className="text-sm text-gray-500">
                 No establishments found.{" "}
@@ -555,8 +661,13 @@ export function SearchPageContent() {
             )}
           </div>
 
-          <div className="lg:sticky lg:top-20 lg:self-start">
+          <div className={`lg:sticky lg:top-20 lg:self-start ${mobileView === "list" ? "hidden lg:block" : ""}`}>
             <EstablishmentMap points={mapPoints} onSearchThisArea={isNearbyMode ? handleSearchThisArea : undefined} />
+            {mapPointsTruncated && (
+              <p className="mt-2 text-xs text-gray-500">
+                Showing the nearest {MAP_POINT_LIMIT} matches on the map. Zoom or search a smaller area to see more.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -572,5 +683,27 @@ function HeroStat({ label }: { label: string }) {
       </svg>
       {label}
     </span>
+  );
+}
+
+function ResultsSkeleton() {
+  return (
+    <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <li key={index} className="animate-pulse rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-3/4 rounded bg-gray-200" />
+              <div className="h-3 w-1/2 rounded bg-gray-200" />
+            </div>
+            <div className="h-8 w-8 shrink-0 rounded-full bg-gray-200" />
+          </div>
+          <div className="mt-3 space-y-2">
+            <div className="h-3 w-full rounded bg-gray-200" />
+            <div className="h-3 w-2/3 rounded bg-gray-200" />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }

@@ -107,6 +107,22 @@ export interface NearbyResponse {
   query: { lat: number; lng: number; radiusMiles: number };
 }
 
+/** A minimal establishment shape for map pins only — see /api/establishments/nearby/map. */
+export interface MapPointRow {
+  id: number;
+  fhrsId: number;
+  businessName: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface NearbyMapPointsResponse {
+  data: MapPointRow[];
+  /** True if there were more matches than the endpoint's point cap — some are omitted. */
+  truncated: boolean;
+  query: { lat: number; lng: number; radiusMiles: number };
+}
+
 export interface BusinessType {
   businessTypeId: number;
   businessType: string;
