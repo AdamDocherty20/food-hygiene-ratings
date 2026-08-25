@@ -12,6 +12,17 @@ import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
 const RADIUS_OPTIONS_MILES = [0.5, 1, 2, 5, 10];
 const DEFAULT_RADIUS_MILES = "2";
+const DEFAULT_SORT = "name";
+const SORT_OPTIONS: { value: string; label: string }[] = [
+  { value: "name", label: "Name (A-Z)" },
+  { value: "rating_desc", label: "Rating (best first)" },
+  { value: "rating_asc", label: "Rating (worst first)" },
+];
+// FHRS's 0-5 scale, newest/best first — used for the quick rating filter chips. FHIS
+// establishments (Scotland's Pass / Improvement Required) aren't covered by these chips
+// since they're a small minority of the dataset and don't fit the same scale; they're
+// still reachable via the ordinary search filters.
+const RATING_CHIPS = ["5", "4", "3", "2", "1", "0"];
 
 // A search result, optionally annotated with distanceMiles when it came from the
 // "near me" (nearby) endpoint rather than the name/postcode/type search endpoint.
@@ -150,6 +161,31 @@ export function SearchPageContent() {
     if (name.trim()) params.set("name", name.trim());
     if (postcode.trim()) params.set("postcode", postcode.trim());
     if (businessTypeId) params.set("businessTypeId", businessTypeId);
+    // Carry over the rating filter/sort refinements across a fresh text search, so
+    // tweaking the name/postcode/type fields doesn't silently discard them.
+    const ratingValue = searchParams.get("ratingValue");
+    const sort = searchParams.get("sort");
+    if (ratingValue) params.set("ratingValue", ratingValue);
+    if (sort && sort !== DEFAULT_SORT) params.set("sort", sort);
+    params.set("page", "1");
+    router.push(`/?${params.toString()}`);
+  }
+
+  // Rating chips and sort only apply to the name/postcode/type search endpoint, not the
+  // nearby (distance-sorted) one — both are no-ops in nearby mode since the params are
+  // simply dropped when "Search near me" replaces the URL wholesale.
+  function setRatingValue(value: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set("ratingValue", value);
+    else params.delete("ratingValue");
+    params.set("page", "1");
+    router.push(`/?${params.toString()}`);
+  }
+
+  function setSort(sort: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (sort === DEFAULT_SORT) params.delete("sort");
+    else params.set("sort", sort);
     params.set("page", "1");
     router.push(`/?${params.toString()}`);
   }
@@ -337,6 +373,54 @@ export function SearchPageContent() {
             {error && (
               <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
                 {error}
+              </div>
+            )}
+
+            {!isIdle && !isNearbyMode && (
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                  Sort by
+                  <select
+                    value={searchParams.get("sort") ?? DEFAULT_SORT}
+                    onChange={(e) => setSort(e.target.value)}
+                    className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-sm text-gray-600">Rating:</span>
+                  <button
+                    type="button"
+                    onClick={() => setRatingValue(null)}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                      !searchParams.get("ratingValue")
+                        ? "border-indigo-600 bg-indigo-600 text-white"
+                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {RATING_CHIPS.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setRatingValue(value)}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                        searchParams.get("ratingValue") === value
+                          ? "border-indigo-600 bg-indigo-600 text-white"
+                          : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
