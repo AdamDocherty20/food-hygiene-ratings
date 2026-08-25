@@ -4,6 +4,7 @@ import { jsonError } from "@/lib/api-response";
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
+import { ratingRankSql } from "@/lib/rating-rank";
 
 const SORT_VALUES = new Set(["name", "rating_desc", "rating_asc"]);
 
@@ -109,17 +110,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Rating sort needs a raw query: ratingValue is a free-text string ("0"-"5" for
-    // FHRS, or a status like "Pass"/"Improvement Required" for FHIS), so there's no
-    // column Prisma's typed orderBy can sort meaningfully by "best first". This CASE
-    // maps both schemes onto a common 0-5 scale; anything with no meaningful rating
-    // (awaiting inspection/publication, exempt) sorts last regardless of direction.
-    const rankExpr = Prisma.sql`CASE
-      WHEN "schemeType" = 'FHRS' AND "ratingValue" ~ '^[0-5]$' THEN ("ratingValue")::int
-      WHEN "schemeType" = 'FHIS' AND "ratingValue" IN ('Pass', 'Pass and Eat Safe') THEN 5
-      WHEN "schemeType" = 'FHIS' AND "ratingValue" = 'Improvement Required' THEN 1
-      ELSE NULL
-    END`;
+    // Rating sort needs a raw query: ratingValue is a free-text string, so there's no
+    // column Prisma's typed orderBy can sort meaningfully by "best first" — see
+    // ratingRankSql's own comment for what it does.
+    const rankExpr = ratingRankSql();
 
     const conditions = [Prisma.sql`"isActive" = true`];
     if (name) conditions.push(Prisma.sql`"businessName" ILIKE ${`%${name}%`}`);

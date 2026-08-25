@@ -1,12 +1,46 @@
 import type { MetadataRoute } from "next";
+import { BUSINESS_CATEGORIES } from "@/lib/business-categories";
+import { LOCAL_AUTHORITIES } from "@/lib/local-authorities";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-// Only the search page is listed here — with 600k+ establishments, enumerating every
-// /establishment/[id] page would mean generating (and keeping in sync with the sync
-// script) a huge sitemap for very little SEO benefit. Search engines can still crawl
-// individual establishment pages via links from the search page itself.
+// With 600k+ establishments, enumerating every /establishment/[id] page would mean
+// generating (and keeping in sync with the sync script) a huge sitemap for very little
+// SEO benefit — search engines can still crawl those via links from other pages. The same
+// reasoning applies to /area: 361 areas x 8 categories is a lot of mostly-low-traffic
+// combinations, so only a bounded, highest-value subset is submitted directly here. The
+// long tail is still `robots.txt`-allowed and linked from /area, just not pushed at
+// crawlers up front.
+const TOP_AREA_COUNT = 40;
+const TOP_AREA_CATEGORY_COUNT = 20;
+
+// Only broad categories present in essentially every local authority (restaurants,
+// takeaways, pubs) are safe to list for every one of the top areas without checking each
+// combination for zero results first — narrower categories (schools, care homes, etc.)
+// are more likely to legitimately not exist in a given area and risk submitting a 404'ing
+// URL to search engines, so those stay reachable-but-unlisted via the area page itself.
+const SITEMAP_SAFE_CATEGORY_SLUGS = new Set(["restaurants-cafes", "takeaways", "pubs-bars"]);
+
 export default function sitemap(): MetadataRoute.Sitemap {
+  const topAreas = [...LOCAL_AUTHORITIES].sort((a, b) => b.count - a.count).slice(0, TOP_AREA_COUNT);
+  const safeCategories = BUSINESS_CATEGORIES.filter((category) => SITEMAP_SAFE_CATEGORY_SLUGS.has(category.slug));
+
+  const areaEntries: MetadataRoute.Sitemap = topAreas.map((authority) => ({
+    url: `${SITE_URL}/area/${authority.slug}`,
+    lastModified: new Date(),
+    changeFrequency: "daily",
+    priority: 0.7,
+  }));
+
+  const categoryEntries: MetadataRoute.Sitemap = topAreas.slice(0, TOP_AREA_CATEGORY_COUNT).flatMap((authority) =>
+    safeCategories.map((category) => ({
+      url: `${SITE_URL}/area/${authority.slug}/${category.slug}`,
+      lastModified: new Date(),
+      changeFrequency: "daily" as const,
+      priority: 0.6,
+    })),
+  );
+
   return [
     {
       url: SITE_URL,
@@ -14,5 +48,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "daily",
       priority: 1,
     },
+    {
+      url: `${SITE_URL}/area`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.5,
+    },
+    ...areaEntries,
+    ...categoryEntries,
   ];
 }

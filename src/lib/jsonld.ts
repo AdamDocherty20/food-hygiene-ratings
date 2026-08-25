@@ -63,3 +63,29 @@ export function buildEstablishmentJsonLd(establishment: JsonLdEstablishment) {
     },
   };
 }
+
+/**
+ * Builds schema.org ItemList structured data for a curated "top rated" landing page
+ * (see src/app/area/[slug]) — helps these pages qualify for rich list-style search
+ * result treatment, separately from the LocalBusiness markup on each linked-to page.
+ */
+export function buildItemListJsonLd(params: {
+  name: string;
+  description: string;
+  url: string;
+  items: { url: string; name: string }[];
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: params.name,
+    description: params.description,
+    url: params.url,
+    itemListElement: params.items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      url: item.url,
+      name: item.name,
+    })),
+  };
+}

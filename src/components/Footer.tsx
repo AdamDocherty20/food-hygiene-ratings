@@ -4,7 +4,10 @@ export function Footer() {
   return (
     <footer className="border-t border-gray-200 bg-white py-8">
       <div className="mx-auto max-w-5xl px-4 text-center text-sm text-gray-500">
-        <p>
+        <p className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <Link href="/area" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+            Browse by Area
+          </Link>
           <Link href="/about" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
             About &amp; FAQ
           </Link>
