@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { ApiError, fetchBusinessTypes, searchEstablishments, searchNearby } from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
-import { formatAddress } from "@/lib/format";
+import { formatAddress, formatDate } from "@/lib/format";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
@@ -72,7 +72,12 @@ type SearchRequestState =
   | { key: string; status: "success"; data: ResultItem[]; pagination: PaginationMeta }
   | { key: string; status: "error"; message: string };
 
-export function SearchPageContent() {
+interface SearchPageContentProps {
+  /** ISO timestamp of the most recent FSA data sync, or null if it couldn't be determined. */
+  lastSyncedAt: string | null;
+}
+
+export function SearchPageContent({ lastSyncedAt }: SearchPageContentProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -241,6 +246,8 @@ export function SearchPageContent() {
     router.push("/");
   }
 
+  const formattedSyncDate = formatDate(lastSyncedAt);
+
   const isIdle = requestState.status === "idle";
   const isLoading = requestState.status === "loading";
   const results = requestState.status === "success" ? requestState.data : [];
@@ -261,7 +268,7 @@ export function SearchPageContent() {
           </p>
           <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-indigo-100">
             <HeroStat label="Official FSA data" />
-            <HeroStat label="Updated daily" />
+            <HeroStat label={formattedSyncDate ? `Data updated ${formattedSyncDate}` : "Updated regularly"} />
             <HeroStat label="600,000+ UK establishments" />
           </div>
         </div>

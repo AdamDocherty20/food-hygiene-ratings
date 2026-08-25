@@ -18,21 +18,31 @@ export function formatAddress(establishment: Pick<Establishment, "addressLine1" 
 }
 
 /**
- * Rating dates are shown next to every rating in the app (a legal requirement of the
- * FSA/OGL attribution terms, not just a UX nicety) — this is the single place that
- * formatting lives so every usage stays consistent.
+ * Shared "25 August 2026"-style formatter — used by formatRatingDate below and by the
+ * homepage's data-freshness indicator, so every date in the app reads the same way.
+ * Returns null (rather than a placeholder string) for missing/invalid input, leaving the
+ * choice of fallback copy to the caller.
  */
-export function formatRatingDate(ratingDate: string | null): string {
-  if (!ratingDate) return "Rating date not available";
+export function formatDate(value: string | null): string | null {
+  if (!value) return null;
 
-  const date = new Date(ratingDate);
-  if (Number.isNaN(date.getTime())) return "Rating date not available";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
 
   return date.toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+}
+
+/**
+ * Rating dates are shown next to every rating in the app (a legal requirement of the
+ * FSA/OGL attribution terms, not just a UX nicety) — this is the single place that
+ * formatting lives so every usage stays consistent.
+ */
+export function formatRatingDate(ratingDate: string | null): string {
+  return formatDate(ratingDate) ?? "Rating date not available";
 }
 
 /**
