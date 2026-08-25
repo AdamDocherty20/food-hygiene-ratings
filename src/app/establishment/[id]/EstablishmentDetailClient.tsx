@@ -9,7 +9,9 @@ import { NearbyEstablishments } from "@/components/NearbyEstablishments";
 import { RatingBadge } from "@/components/RatingBadge";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
+import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
 import { formatAddress, formatRatingDate, humanizeStatus, toEstablishmentSummary } from "@/lib/format";
+import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { recordRecentlyViewed } from "@/lib/recently-viewed";
 import { establishmentPath, parseFhrsIdParam } from "@/lib/slug";
 import type { Establishment, EstablishmentDetailResponse, FsaDetail } from "@/lib/types";
@@ -50,28 +52,36 @@ function BackLink() {
   );
 }
 
-// Home › local authority › business type › business name — the first three levels link
-// back into a filtered search, the last is the current page (not a link). Doubles as a
-// small SEO/internal-linking boost since every establishment page fans back out to two
-// filtered search views.
+// Home › local authority › business type › business name — the last is the current page
+// (not a link). Where the establishment's local authority/business type have a dedicated
+// /area landing page, the first two levels link there instead of a filtered search view —
+// that's the page we actually want ranking, so this fans link equity from every
+// establishment page back up into it. Falls back to a filtered search link for the
+// authorities/types that don't have a landing page (see local-authorities.ts and
+// business-categories.ts for why some are excluded).
 function Breadcrumbs({ establishment }: { establishment: Establishment }) {
+  const authority = getLocalAuthorityByName(establishment.localAuthorityName);
+  const category = getBusinessCategoryByTypeId(establishment.businessTypeId);
+
+  const areaHref = authority
+    ? `/area/${authority.slug}`
+    : `/?localAuthorityName=${encodeURIComponent(establishment.localAuthorityName)}`;
+  const categoryHref =
+    authority && category
+      ? `/area/${authority.slug}/${category.slug}`
+      : `/?businessTypeId=${establishment.businessTypeId}`;
+
   return (
     <nav aria-label="Breadcrumb" className="mt-3 flex flex-wrap items-center gap-1 text-xs text-gray-500">
       <Link href="/" className="hover:text-indigo-600 hover:underline">
         Home
       </Link>
       <span aria-hidden>›</span>
-      <Link
-        href={`/?localAuthorityName=${encodeURIComponent(establishment.localAuthorityName)}`}
-        className="hover:text-indigo-600 hover:underline"
-      >
+      <Link href={areaHref} className="hover:text-indigo-600 hover:underline">
         {establishment.localAuthorityName}
       </Link>
       <span aria-hidden>›</span>
-      <Link
-        href={`/?businessTypeId=${establishment.businessTypeId}`}
-        className="hover:text-indigo-600 hover:underline"
-      >
+      <Link href={categoryHref} className="hover:text-indigo-600 hover:underline">
         {establishment.businessType}
       </Link>
       <span aria-hidden>›</span>

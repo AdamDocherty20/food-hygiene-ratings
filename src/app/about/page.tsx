@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildFaqJsonLd } from "@/lib/jsonld";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const TITLE = "About & FAQ";
@@ -32,6 +33,32 @@ const FHIS_SCALE: { score: string; meaning: string }[] = [
   { score: "Awaiting Inspection", meaning: "The business hasn't been inspected yet, or a report hasn't been published" },
 ];
 
+// Shared between the rendered FAQ section below and its FAQPage JSON-LD — keeping one
+// source of truth means the structured data can never drift from what's actually on the
+// page (a mismatch there is exactly what Google's structured-data guidelines warn against).
+const FAQ_ITEMS: { question: string; answer: string }[] = [
+  {
+    question: "How often is the data updated?",
+    answer:
+      "A sync job pulls the latest ratings from the Food Standards Agency once a day. The exact date the data was last refreshed is shown on the homepage.",
+  },
+  {
+    question: "Who carries out the inspections?",
+    answer:
+      "Local authority environmental health officers carry out the inspections, not the FSA or this site. We only display the ratings they publish.",
+  },
+  {
+    question: "Is this an official FSA site?",
+    answer:
+      "No. Should I Eat Here is an independent, unofficial tool and isn't affiliated with or endorsed by the Food Standards Agency. For the official source, visit ratings.food.gov.uk.",
+  },
+  {
+    question: "A rating looks wrong or out of date — what do I do?",
+    answer:
+      "Ratings come directly from the FSA's published data, so any correction needs to happen at the source. Check the official listing on ratings.food.gov.uk — once it's corrected there, it will appear here at the next daily sync.",
+  },
+];
+
 function ScaleTable({ rows }: { rows: { score: string; meaning: string }[] }) {
   return (
     <dl className="mt-4 divide-y divide-gray-200 overflow-hidden rounded-lg border border-gray-200 bg-white">
@@ -46,8 +73,11 @@ function ScaleTable({ rows }: { rows: { score: string; meaning: string }[] }) {
 }
 
 export default function AboutPage() {
+  const faqJsonLd = buildFaqJsonLd(FAQ_ITEMS);
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <h1 className="text-2xl font-bold tracking-tight text-gray-900">About &amp; FAQ</h1>
       <p className="mt-2 text-sm text-gray-600">
         Should I Eat Here makes it quick to check the official food hygiene rating for restaurants, takeaways,

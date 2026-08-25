@@ -27,7 +27,15 @@ export const BUSINESS_CATEGORIES: BusinessCategory[] = [
 ];
 
 const BY_SLUG = new Map(BUSINESS_CATEGORIES.map((c) => [c.slug, c]));
+const BY_TYPE_ID = new Map(BUSINESS_CATEGORIES.flatMap((c) => c.businessTypeIds.map((id) => [id, c] as const)));
 
 export function getBusinessCategoryBySlug(slug: string): BusinessCategory | null {
   return BY_SLUG.get(slug) ?? null;
+}
+
+// Reverse lookup for internal linking from an establishment's raw businessTypeId (e.g.
+// its breadcrumb) back to its /area/[slug]/[category] page. Returns null for the 5 raw
+// FSA types deliberately excluded from this curated list (see file header).
+export function getBusinessCategoryByTypeId(businessTypeId: number): BusinessCategory | null {
+  return BY_TYPE_ID.get(businessTypeId) ?? null;
 }

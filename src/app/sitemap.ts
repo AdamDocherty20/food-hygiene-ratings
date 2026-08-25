@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { BUSINESS_CATEGORIES } from "@/lib/business-categories";
 import { LOCAL_AUTHORITIES } from "@/lib/local-authorities";
+import { prisma } from "@/lib/prisma";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
@@ -21,13 +22,20 @@ const TOP_AREA_CATEGORY_COUNT = 20;
 // URL to search engines, so those stay reachable-but-unlisted via the area page itself.
 const SITEMAP_SAFE_CATEGORY_SLUGS = new Set(["restaurants-cafes", "takeaways", "pubs-bars"]);
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const topAreas = [...LOCAL_AUTHORITIES].sort((a, b) => b.count - a.count).slice(0, TOP_AREA_COUNT);
   const safeCategories = BUSINESS_CATEGORIES.filter((category) => SITEMAP_SAFE_CATEGORY_SLUGS.has(category.slug));
 
+  // The daily sync updates lastSeenAt on every active row it touches, so the most recent
+  // value across the table is effectively "when the data was last refreshed" — a truthful
+  // lastModified for these ranking-driven pages, instead of `new Date()` re-stamping every
+  // entry as "changed" on every deploy regardless of whether the underlying data moved.
+  const latestSync = await prisma.establishment.aggregate({ _max: { lastSeenAt: true }, where: { isActive: true } });
+  const lastModified = latestSync._max.lastSeenAt ?? new Date();
+
   const areaEntries: MetadataRoute.Sitemap = topAreas.map((authority) => ({
     url: `${SITE_URL}/area/${authority.slug}`,
-    lastModified: new Date(),
+    lastModified,
     changeFrequency: "daily",
     priority: 0.7,
   }));
@@ -35,7 +43,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const categoryEntries: MetadataRoute.Sitemap = topAreas.slice(0, TOP_AREA_CATEGORY_COUNT).flatMap((authority) =>
     safeCategories.map((category) => ({
       url: `${SITE_URL}/area/${authority.slug}/${category.slug}`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "daily" as const,
       priority: 0.6,
     })),
@@ -44,15 +52,27 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
       url: SITE_URL,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "daily",
       priority: 1,
     },
     {
       url: `${SITE_URL}/area`,
-      lastModified: new Date(),
+      lastModified,
       changeFrequency: "weekly",
       priority: 0.5,
+    },
+    {
+      url: `${SITE_URL}/about`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.4,
+    },
+    {
+      url: `${SITE_URL}/guide`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.4,
     },
     ...areaEntries,
     ...categoryEntries,

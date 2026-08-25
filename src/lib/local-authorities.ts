@@ -379,7 +379,15 @@ export const LOCAL_AUTHORITIES: LocalAuthority[] = [
 ];
 
 const BY_SLUG = new Map(LOCAL_AUTHORITIES.map((a) => [a.slug, a]));
+const BY_NAME = new Map(LOCAL_AUTHORITIES.map((a) => [a.name, a]));
 
 export function getLocalAuthorityBySlug(slug: string): LocalAuthority | null {
   return BY_SLUG.get(slug) ?? null;
+}
+
+// Reverse lookup for internal linking from an establishment's raw localAuthorityName
+// (e.g. its breadcrumb) back to its /area/[slug] landing page. Returns null for the
+// handful of low-count authorities excluded from this list entirely (see file header).
+export function getLocalAuthorityByName(name: string): LocalAuthority | null {
+  return BY_NAME.get(name) ?? null;
 }

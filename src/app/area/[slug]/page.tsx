@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { AreaEstablishmentList } from "@/components/area/AreaEstablishmentList";
 import { getTopRatedInArea } from "@/lib/area-queries";
 import { BUSINESS_CATEGORIES } from "@/lib/business-categories";
-import { buildItemListJsonLd } from "@/lib/jsonld";
+import { buildBreadcrumbJsonLd, buildItemListJsonLd } from "@/lib/jsonld";
 import { getLocalAuthorityBySlug } from "@/lib/local-authorities";
 import { establishmentPath } from "@/lib/slug";
 
@@ -56,9 +56,16 @@ export default async function AreaPage({ params }: { params: Promise<{ slug: str
 
   const searchHref = `/?localAuthorityName=${encodeURIComponent(authority.name)}&sort=rating_desc`;
 
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Home", url: SITE_URL },
+    { name: "All areas", url: `${SITE_URL}/area` },
+    { name: authority.name, url },
+  ]);
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
       <nav className="text-sm text-gray-500">
         <Link href="/area" className="hover:text-indigo-600 hover:underline">

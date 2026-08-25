@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildBreadcrumbJsonLd } from "@/lib/jsonld";
 import { LOCAL_AUTHORITIES, type LocalAuthority } from "@/lib/local-authorities";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -31,9 +32,14 @@ function groupByFirstLetter(authorities: LocalAuthority[]): Map<string, LocalAut
 
 export default function AreaIndexPage() {
   const grouped = groupByFirstLetter(LOCAL_AUTHORITIES);
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Home", url: SITE_URL },
+    { name: "All areas", url: `${SITE_URL}/area` },
+  ]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <h1 className="text-2xl font-bold tracking-tight text-gray-900">Food Hygiene Ratings by Area</h1>
       <p className="mt-2 text-sm text-gray-600">
         {LOCAL_AUTHORITIES.length} UK local authorities — pick one to see the best-rated food businesses there.

@@ -8,6 +8,9 @@ export function Footer() {
           <Link href="/area" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
             Browse by Area
           </Link>
+          <Link href="/guide" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+            Guide
+          </Link>
           <Link href="/about" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
             About &amp; FAQ
           </Link>

@@ -89,3 +89,70 @@ export function buildItemListJsonLd(params: {
     })),
   };
 }
+
+/**
+ * Builds schema.org BreadcrumbList structured data — lets Google render the folder-path
+ * breadcrumb trail under the blue link in search results instead of the raw URL. `items`
+ * should be ordered root-first; the current page is included as the last entry.
+ */
+export function buildBreadcrumbJsonLd(items: { name: string; url: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  };
+}
+
+/**
+ * Site-level WebSite schema with a SearchAction — this is what makes Google eligible to
+ * show a sitelinks searchbox directly in search results. `name` here maps to this app's
+ * "Business name" search field (the `name` query param read in SearchPageContent).
+ */
+export function buildWebsiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Should I Eat Here",
+    url: SITE_URL,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_URL}/?name={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+}
+
+/** Site-level Organization schema — basic brand/entity identity signal for Google. */
+export function buildOrganizationJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Should I Eat Here",
+    url: SITE_URL,
+  };
+}
+
+/**
+ * Builds schema.org FAQPage structured data — eligible for an expandable Q&A rich result
+ * directly in search. Callers should build this from the same data array they render in
+ * the page body, so the structured data can never say something the visible page doesn't.
+ */
+export function buildFaqJsonLd(items: { question: string; answer: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.question,
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: item.answer,
+      },
+    })),
+  };
+}
