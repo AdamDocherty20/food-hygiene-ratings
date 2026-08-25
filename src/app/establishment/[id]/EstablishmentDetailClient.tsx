@@ -192,26 +192,46 @@ function OtherLocationsSection({ locations }: { locations: EstablishmentDetailRe
 
 // The FHRS component score breakdown, fetched live from the FSA (not in the bulk feed
 // scripts/sync.ts imports, so it isn't in our own database). Counterintuitively, lower is
-// better on all three — 0 is the best possible score — so we spell that out rather than
-// letting a "5" read as a good number the way the overall rating does.
+// better on all three — 0 is the best possible score — and each measure has its own max
+// (these are the FSA's fixed scoring bands, not something this app invents). Shown as
+// "value / max" with a low-fill bar, rather than a bare number, specifically so a "5" here
+// doesn't get misread as "5 out of 5" the way the star rating elsewhere on the page does —
+// on a 0-25 scale, 5 is actually one of the best possible scores.
+const SCORE_MAX = {
+  hygiene: 25,
+  structural: 20,
+  confidenceInManagement: 30,
+} as const;
+
 function ScoreBreakdown({ scores }: { scores: NonNullable<FsaDetail["scores"]> }) {
-  const rows: { label: string; value: number }[] = [
-    { label: "Hygienic food handling", value: scores.hygiene },
-    { label: "Cleanliness of facilities", value: scores.structural },
-    { label: "Confidence in management", value: scores.confidenceInManagement },
+  const rows: { label: string; value: number; max: number }[] = [
+    { label: "Hygienic food handling", value: scores.hygiene, max: SCORE_MAX.hygiene },
+    { label: "Cleanliness of facilities", value: scores.structural, max: SCORE_MAX.structural },
+    { label: "Confidence in management", value: scores.confidenceInManagement, max: SCORE_MAX.confidenceInManagement },
   ];
 
   return (
     <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <h2 className="text-sm font-semibold text-gray-900">Inspection score breakdown</h2>
       <p className="mt-1 text-xs text-gray-500">
-        Lower scores are better — 0 is the best possible score on each measure.
+        These are separate from the 0-5 star rating above — <strong>lower is better</strong> here, with 0 the
+        best possible score on each measure.
       </p>
-      <dl className="mt-4 space-y-2">
+      <dl className="mt-4 space-y-3">
         {rows.map((row) => (
-          <div key={row.label} className="flex items-center justify-between gap-4 text-sm">
-            <dt className="text-gray-600">{row.label}</dt>
-            <dd className="font-medium text-gray-900">{row.value}</dd>
+          <div key={row.label}>
+            <div className="flex items-center justify-between gap-4 text-sm">
+              <dt className="text-gray-600">{row.label}</dt>
+              <dd className="font-medium text-gray-900">
+                {row.value} <span className="text-gray-400">/ {row.max}</span>
+              </dd>
+            </div>
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+              <div
+                className="h-full rounded-full bg-indigo-400"
+                style={{ width: `${Math.min(100, (row.value / row.max) * 100)}%` }}
+              />
+            </div>
           </div>
         ))}
       </dl>
