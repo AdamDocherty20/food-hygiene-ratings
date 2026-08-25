@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ApiError, fetchBusinessTypes, searchEstablishments, searchNearby } from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
+import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
 import { formatAddress, formatDate } from "@/lib/format";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
@@ -453,6 +454,8 @@ export function SearchPageContent({ lastSyncedAt }: SearchPageContentProps) {
                 )}
               </div>
             )}
+
+            {isIdle && <RecentlyViewedStrip />}
 
             {isIdle ? (
               <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">

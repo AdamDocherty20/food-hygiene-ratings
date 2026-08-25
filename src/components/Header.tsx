@@ -30,15 +30,26 @@ export function Header() {
           <BrandMark />
           <span>Should I Eat Here</span>
         </Link>
-        <a
-          href="https://ratings.food.gov.uk"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden text-sm font-medium text-gray-500 transition-colors hover:text-indigo-600 sm:inline-flex sm:items-center sm:gap-1"
-        >
-          Official FSA site
-          <span aria-hidden>↗</span>
-        </a>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/saved"
+            className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-indigo-600"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-4-7 4V5z" />
+            </svg>
+            Saved
+          </Link>
+          <a
+            href="https://ratings.food.gov.uk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden text-sm font-medium text-gray-500 transition-colors hover:text-indigo-600 sm:inline-flex sm:items-center sm:gap-1"
+          >
+            Official FSA site
+            <span aria-hidden>↗</span>
+          </a>
+        </div>
       </div>
     </header>
   );

@@ -28,6 +28,24 @@ export interface EstablishmentWithDistance extends Establishment {
   distanceMiles: number;
 }
 
+/**
+ * The minimal snapshot of an establishment persisted client-side for the "saved" and
+ * "recently viewed" localStorage lists (see src/lib/saved-establishments.ts and
+ * src/lib/recently-viewed.ts) — just enough to render a summary card without an extra
+ * API round trip per entry. May go slightly stale if the establishment is re-rated later;
+ * both list pages link through to the live establishment page for the current rating.
+ */
+export interface EstablishmentSummary {
+  fhrsId: number;
+  businessName: string;
+  businessType: string;
+  addressLine1: string | null;
+  postcode: string | null;
+  ratingValue: string;
+  schemeType: string;
+  ratingDate: string | null;
+}
+
 /** Another active branch of the same chain — see GET /api/establishments/[id]. */
 export interface OtherLocation {
   fhrsId: number;

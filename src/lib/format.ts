@@ -1,4 +1,22 @@
-import type { Establishment } from "@/lib/types";
+import type { Establishment, EstablishmentSummary } from "@/lib/types";
+
+/**
+ * Extracts just the fields needed for a compact summary card — used to build the entries
+ * stored in the client-side "saved" and "recently viewed" lists (see
+ * src/lib/saved-establishments.ts and src/lib/recently-viewed.ts).
+ */
+export function toEstablishmentSummary(establishment: Establishment): EstablishmentSummary {
+  return {
+    fhrsId: establishment.fhrsId,
+    businessName: establishment.businessName,
+    businessType: establishment.businessType,
+    addressLine1: establishment.addressLine1,
+    postcode: establishment.postcode,
+    ratingValue: establishment.ratingValue,
+    schemeType: establishment.schemeType,
+    ratingDate: establishment.ratingDate,
+  };
+}
 
 /**
  * Joins whatever address lines + postcode are actually populated. FSA data is

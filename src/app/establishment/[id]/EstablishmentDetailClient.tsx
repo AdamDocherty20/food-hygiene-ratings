@@ -7,8 +7,10 @@ import { ApiError, fetchEstablishment } from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { NearbyEstablishments } from "@/components/NearbyEstablishments";
 import { RatingBadge } from "@/components/RatingBadge";
+import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
-import { formatAddress, formatRatingDate, humanizeStatus } from "@/lib/format";
+import { formatAddress, formatRatingDate, humanizeStatus, toEstablishmentSummary } from "@/lib/format";
+import { recordRecentlyViewed } from "@/lib/recently-viewed";
 import { establishmentPath, parseFhrsIdParam } from "@/lib/slug";
 import type { Establishment, EstablishmentDetailResponse, FsaDetail } from "@/lib/types";
 
@@ -315,6 +317,14 @@ export function EstablishmentDetailClient() {
     }
   }, [requestState, router]);
 
+  // Records this establishment in the "recently viewed" localStorage list (see
+  // src/lib/recently-viewed.ts) once it's loaded — feeds the homepage strip so a visitor
+  // can jump back into establishments they've looked at without re-searching.
+  useEffect(() => {
+    if (requestState.status !== "success") return;
+    recordRecentlyViewed(toEstablishmentSummary(requestState.data.data));
+  }, [requestState]);
+
   if (requestState.status === "loading") {
     return (
       <div className="mx-auto max-w-3xl px-4 py-8">
@@ -367,6 +377,7 @@ export function EstablishmentDetailClient() {
           {establishment.latitude !== null && establishment.longitude !== null && (
             <DirectionsLink lat={establishment.latitude} lng={establishment.longitude} />
           )}
+          <SaveButton establishment={toEstablishmentSummary(establishment)} />
           <ShareButton title={establishment.businessName} text={shareText} />
         </div>
       </div>
