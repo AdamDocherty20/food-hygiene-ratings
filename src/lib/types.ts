@@ -40,6 +40,12 @@ export interface SearchResponse {
   pagination: PaginationMeta;
 }
 
+export interface NearbyResponse {
+  data: EstablishmentWithDistance[];
+  pagination: PaginationMeta;
+  query: { lat: number; lng: number; radiusMiles: number };
+}
+
 export interface BusinessType {
   businessTypeId: number;
   businessType: string;

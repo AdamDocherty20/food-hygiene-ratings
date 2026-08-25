@@ -3,14 +3,21 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ApiError, fetchBusinessTypes, searchEstablishments } from "@/lib/api-client";
+import { ApiError, fetchBusinessTypes, searchEstablishments, searchNearby } from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
 import { formatAddress } from "@/lib/format";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
-function toMapPoints(results: Establishment[]): MapPoint[] {
+const RADIUS_OPTIONS_MILES = [0.5, 1, 2, 5, 10];
+const DEFAULT_RADIUS_MILES = "2";
+
+// A search result, optionally annotated with distanceMiles when it came from the
+// "near me" (nearby) endpoint rather than the name/postcode/type search endpoint.
+type ResultItem = Establishment & { distanceMiles?: number };
+
+function toMapPoints(results: ResultItem[]): MapPoint[] {
   return results
     .filter((result): result is Establishment & { latitude: number; longitude: number } => result.latitude !== null && result.longitude !== null)
     .map((result) => ({
@@ -34,16 +41,24 @@ function buildSearchKey(searchParams: URLSearchParams): string {
 // The homepage deliberately shows nothing (just the form + an empty map) until the
 // visitor actually searches for something — no fetch happens, and no arbitrary slice
 // of the 600k+ establishments gets rendered, until at least one real filter is present.
+// A "near me" search (lat+lng) counts as a filter in exactly the same way.
 function hasActiveFilters(searchParams: URLSearchParams): boolean {
   return Boolean(
-    searchParams.get("name")?.trim() || searchParams.get("postcode")?.trim() || searchParams.get("businessTypeId"),
+    searchParams.get("name")?.trim() ||
+      searchParams.get("postcode")?.trim() ||
+      searchParams.get("businessTypeId") ||
+      isNearbySearch(searchParams),
   );
+}
+
+function isNearbySearch(searchParams: URLSearchParams): boolean {
+  return Boolean(searchParams.get("lat") && searchParams.get("lng"));
 }
 
 type SearchRequestState =
   | { key: string; status: "idle" }
   | { key: string; status: "loading" }
-  | { key: string; status: "success"; data: Establishment[]; pagination: PaginationMeta }
+  | { key: string; status: "success"; data: ResultItem[]; pagination: PaginationMeta }
   | { key: string; status: "error"; message: string };
 
 export function SearchPageContent() {
@@ -77,6 +92,7 @@ export function SearchPageContent() {
   // synchronously in the effect body).
   const searchKey = buildSearchKey(searchParams);
   const hasFilters = hasActiveFilters(searchParams);
+  const isNearbyMode = isNearbySearch(searchParams);
   const [requestState, setRequestState] = useState<SearchRequestState>({
     key: searchKey,
     status: hasFilters ? "loading" : "idle",
@@ -85,12 +101,17 @@ export function SearchPageContent() {
     setRequestState({ key: searchKey, status: hasFilters ? "loading" : "idle" });
   }
 
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!hasFilters) return;
 
     let cancelled = false;
+    const params = new URLSearchParams(searchKey);
+    const request = isNearbyMode ? searchNearby(params) : searchEstablishments(params);
 
-    searchEstablishments(new URLSearchParams(searchKey))
+    request
       .then((response) => {
         if (cancelled) return;
         setRequestState({ key: searchKey, status: "success", data: response.data, pagination: response.pagination });
@@ -107,7 +128,7 @@ export function SearchPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [searchKey, hasFilters]);
+  }, [searchKey, hasFilters, isNearbyMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,6 +158,51 @@ export function SearchPageContent() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", String(page));
     router.push(`/?${params.toString()}`);
+  }
+
+  // Switches into "near me" mode: replaces whatever text-based search was active with a
+  // radius search centred on the browser's reported position. Kept as its own mode
+  // (rather than layering onto the name/postcode form) since the nearby endpoint doesn't
+  // support those filters — the two search modes are mutually exclusive in the URL.
+  function handleUseLocation() {
+    if (!("geolocation" in navigator)) {
+      setLocationError("Location isn't supported by this browser.");
+      return;
+    }
+    setLocationError(null);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocating(false);
+        const params = new URLSearchParams();
+        params.set("lat", position.coords.latitude.toFixed(5));
+        params.set("lng", position.coords.longitude.toFixed(5));
+        params.set("radiusMiles", DEFAULT_RADIUS_MILES);
+        params.set("page", "1");
+        router.push(`/?${params.toString()}`);
+      },
+      (geoError) => {
+        setLocating(false);
+        setLocationError(
+          geoError.code === geoError.PERMISSION_DENIED
+            ? "Location access was denied — enable it in your browser settings to use this."
+            : "Couldn't determine your location. Please try again.",
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 5 * 60 * 1000 },
+    );
+  }
+
+  function setRadiusMiles(radiusMiles: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("radiusMiles", radiusMiles);
+    params.set("page", "1");
+    router.push(`/?${params.toString()}`);
+  }
+
+  function clearLocation() {
+    setLocationError(null);
+    router.push("/");
   }
 
   const isIdle = requestState.status === "idle";
@@ -227,6 +293,45 @@ export function SearchPageContent() {
           </div>
         </form>
 
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleUseLocation}
+            disabled={locating}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 21c-4.5-4.2-7-7.9-7-11a7 7 0 1114 0c0 3.1-2.5 6.8-7 11z" />
+              <circle cx="12" cy="10" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {locating ? "Finding you…" : "Search near me"}
+          </button>
+
+          {isNearbyMode && (
+            <>
+              <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                Within
+                <select
+                  value={searchParams.get("radiusMiles") ?? DEFAULT_RADIUS_MILES}
+                  onChange={(e) => setRadiusMiles(e.target.value)}
+                  className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+                >
+                  {RADIUS_OPTIONS_MILES.map((mi) => (
+                    <option key={mi} value={mi}>
+                      {mi} mi
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button type="button" onClick={clearLocation} className="text-sm font-medium text-indigo-600 hover:underline">
+                Clear location
+              </button>
+            </>
+          )}
+
+          {locationError && <p className="text-sm text-red-600">{locationError}</p>}
+        </div>
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <div>
             {error && (
@@ -246,14 +351,18 @@ export function SearchPageContent() {
                 <div>
                   <p className="text-sm font-medium text-gray-700">Search to see results</p>
                   <p className="mt-1 text-sm text-gray-500">
-                    Enter a business name, postcode, or business type above to find food hygiene ratings.
+                    Enter a business name, postcode, or business type above — or use &ldquo;Search near me&rdquo; —
+                    to find food hygiene ratings.
                   </p>
                 </div>
               </div>
             ) : isLoading ? (
               <p className="text-sm text-gray-500">Loading results…</p>
             ) : results.length === 0 ? (
-              <p className="text-sm text-gray-500">No establishments found. Try adjusting your search.</p>
+              <p className="text-sm text-gray-500">
+                No establishments found.{" "}
+                {isNearbyMode ? "Try a wider radius." : "Try adjusting your search."}
+              </p>
             ) : (
               <ul className="flex flex-col gap-3">
                 {results.map((result) => (
@@ -267,6 +376,11 @@ export function SearchPageContent() {
                           <p className="font-semibold text-gray-900">{result.businessName}</p>
                           <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
                           <p className="mt-1 text-sm text-gray-600">{formatAddress(result)}</p>
+                          {typeof result.distanceMiles === "number" && (
+                            <p className="mt-1 text-xs font-medium text-indigo-600">
+                              {result.distanceMiles.toFixed(1)} mi away
+                            </p>
+                          )}
                         </div>
                         <RatingBadge
                           schemeType={result.schemeType}

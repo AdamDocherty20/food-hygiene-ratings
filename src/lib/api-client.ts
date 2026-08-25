@@ -1,4 +1,4 @@
-import type { ApiErrorResponse, BusinessTypesResponse, Establishment, SearchResponse } from "@/lib/types";
+import type { ApiErrorResponse, BusinessTypesResponse, Establishment, NearbyResponse, SearchResponse } from "@/lib/types";
 
 export class ApiError extends Error {
   status: number;
@@ -28,6 +28,10 @@ async function getJson<T>(url: string): Promise<T> {
 
 export function searchEstablishments(params: URLSearchParams): Promise<SearchResponse> {
   return getJson<SearchResponse>(`/api/establishments/search?${params.toString()}`);
+}
+
+export function searchNearby(params: URLSearchParams): Promise<NearbyResponse> {
+  return getJson<NearbyResponse>(`/api/establishments/nearby?${params.toString()}`);
 }
 
 export function fetchBusinessTypes(): Promise<BusinessTypesResponse> {
