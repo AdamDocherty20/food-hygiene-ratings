@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ApiError, fetchBusinessTypes, searchEstablishments, searchNearby } from "@/lib/api-client";
-import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
+import { EstablishmentMap, type MapPoint, type SearchThisAreaQuery } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
 import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
 import { formatAddress } from "@/lib/format";
@@ -13,6 +13,9 @@ import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
 const RADIUS_OPTIONS_MILES = [0.5, 1, 2, 5, 10];
 const DEFAULT_RADIUS_MILES = "2";
+// Matches the server-side cap in /api/establishments/nearby — radius values above this
+// get silently clamped down there anyway, so there's no point asking for more.
+const MAX_RADIUS_MILES = 10;
 const DEFAULT_SORT = "name";
 const SORT_OPTIONS: { value: string; label: string }[] = [
   { value: "name", label: "Name (A-Z)" },
@@ -39,6 +42,16 @@ function toMapPoints(results: ResultItem[]): MapPoint[] {
       label: result.businessName,
       href: establishmentPath(result.fhrsId, result.businessName),
     }));
+}
+
+// "Search this area" reports the exact radius needed to cover the visible map, but the
+// radius <select> only offers a fixed set of steps — round up to the nearest one that's
+// at least as big (falling back to the largest/capped option) so nothing visible on the
+// map falls outside the radius that gets searched.
+function snapRadiusMiles(radiusMiles: number): string {
+  const capped = Math.min(radiusMiles, MAX_RADIUS_MILES);
+  const snapped = RADIUS_OPTIONS_MILES.find((option) => option >= capped);
+  return String(snapped ?? MAX_RADIUS_MILES);
 }
 
 // Normalizes the current URL search params into the exact query string that will be
@@ -252,6 +265,19 @@ export function SearchPageContent() {
   function clearLocation() {
     setLocationError(null);
     router.push("/");
+  }
+
+  // Fired when the visitor pans/zooms the map themselves and clicks the "Search this
+  // area" button that then appears — re-centres the nearby search on wherever they've
+  // moved to, with a radius wide enough to cover everything currently on screen (e.g.
+  // zooming out from Ingleby Barwick to also see Thornaby brings in its pins too).
+  function handleSearchThisArea(query: SearchThisAreaQuery) {
+    const params = new URLSearchParams();
+    params.set("lat", query.lat.toFixed(5));
+    params.set("lng", query.lng.toFixed(5));
+    params.set("radiusMiles", snapRadiusMiles(query.radiusMiles));
+    params.set("page", "1");
+    router.push(`/?${params.toString()}`);
   }
 
   const isIdle = requestState.status === "idle";
@@ -530,7 +556,7 @@ export function SearchPageContent() {
           </div>
 
           <div className="lg:sticky lg:top-20 lg:self-start">
-            <EstablishmentMap points={mapPoints} />
+            <EstablishmentMap points={mapPoints} onSearchThisArea={isNearbyMode ? handleSearchThisArea : undefined} />
           </div>
         </div>
       </div>

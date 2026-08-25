@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { MapPoint } from "@/components/EstablishmentMapInner";
+import type { MapPoint, SearchThisAreaQuery } from "@/components/EstablishmentMapInner";
 
 interface EstablishmentMapProps {
   points: MapPoint[];
   heightClassName?: string;
+  onSearchThisArea?: (query: SearchThisAreaQuery) => void;
 }
 
 const DEFAULT_HEIGHT_CLASSNAME = "h-[500px]";
@@ -23,8 +24,12 @@ const EstablishmentMapInner = dynamic(() => import("@/components/EstablishmentMa
   ),
 });
 
-export function EstablishmentMap({ points, heightClassName = DEFAULT_HEIGHT_CLASSNAME }: EstablishmentMapProps) {
-  return <EstablishmentMapInner points={points} heightClassName={heightClassName} />;
+export function EstablishmentMap({
+  points,
+  heightClassName = DEFAULT_HEIGHT_CLASSNAME,
+  onSearchThisArea,
+}: EstablishmentMapProps) {
+  return <EstablishmentMapInner points={points} heightClassName={heightClassName} onSearchThisArea={onSearchThisArea} />;
 }
 
-export type { MapPoint };
+export type { MapPoint, SearchThisAreaQuery };
