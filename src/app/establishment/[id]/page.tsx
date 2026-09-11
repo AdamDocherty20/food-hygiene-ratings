@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { EstablishmentClientExtras } from "./EstablishmentClientExtras";
-import { BackLink, DirectionsLink, EstablishmentDetailHero } from "./EstablishmentDetailServer";
+import { BackLink, DirectionsLink, EstablishmentDetailHero, NearbyEstablishmentsSection } from "./EstablishmentDetailServer";
 import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { SaveButton } from "@/components/SaveButton";
@@ -120,7 +120,7 @@ export default async function EstablishmentDetailPage({ params }: { params: Prom
       />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
 
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-4">
         <BackLink />
         <div className="flex items-center gap-2">
           {establishment.latitude !== null && establishment.longitude !== null && (
@@ -133,13 +133,15 @@ export default async function EstablishmentDetailPage({ params }: { params: Prom
 
       <EstablishmentDetailHero detail={detail} />
 
+      <EstablishmentClientExtras fhrsId={establishment.fhrsId} summary={toEstablishmentSummary(establishment)} />
+
       {mapPoints.length > 0 && (
         <div className="mt-6">
           <EstablishmentMap points={mapPoints} heightClassName="h-[350px]" />
         </div>
       )}
 
-      <EstablishmentClientExtras fhrsId={establishment.fhrsId} summary={toEstablishmentSummary(establishment)} />
+      <NearbyEstablishmentsSection items={detail.nearby} />
     </div>
   );
 }

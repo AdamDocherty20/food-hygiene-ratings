@@ -31,7 +31,10 @@ function ratingAccentClasses(schemeType: string, ratingValue: string): string {
 
 export function BackLink() {
   return (
-    <Link href="/" className="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:underline">
+    <Link
+      href="/"
+      className="inline-flex items-center gap-1 whitespace-nowrap text-sm font-medium text-indigo-600 hover:underline"
+    >
       <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
       </svg>
@@ -290,23 +293,32 @@ export function NearbyEstablishmentsSection({ items }: { items: NearbyEstablishm
   return (
     <div className="mt-6">
       <h2 className="text-base font-semibold text-gray-900">Other places nearby</h2>
-      <ul className="mt-3 flex gap-3 overflow-x-auto pb-2">
-        {items.map((item) => (
-          <li key={item.id} className="w-56 shrink-0">
-            <Link
-              href={establishmentPath(item.fhrsId, item.businessName)}
-              className="block h-full rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
-            >
-              <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.businessName}</p>
-              <p className="mt-0.5 truncate text-xs text-gray-500">{formatAddress(item)}</p>
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-indigo-600">{item.distanceMiles.toFixed(1)} mi away</span>
-                <RatingBadge schemeType={item.schemeType} ratingValue={item.ratingValue} ratingDate={item.ratingDate} />
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {/* The fade is a static edge cue (not scroll-aware — that'd need a client component)
+          that there's more to scroll, since the list otherwise just clips mid-card with no
+          visual hint. Right-fade only, since the list always starts scrolled to the left. */}
+      <div className="relative mt-3">
+        <ul className="flex gap-3 overflow-x-auto pb-2">
+          {items.map((item) => (
+            <li key={item.id} className="w-56 shrink-0">
+              <Link
+                href={establishmentPath(item.fhrsId, item.businessName)}
+                className="block h-full rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+              >
+                <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.businessName}</p>
+                <p className="mt-0.5 truncate text-xs text-gray-500">{formatAddress(item)}</p>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-indigo-600">{item.distanceMiles.toFixed(1)} mi away</span>
+                  <RatingBadge schemeType={item.schemeType} ratingValue={item.ratingValue} ratingDate={item.ratingDate} />
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-gray-50 to-transparent"
+          aria-hidden
+        />
+      </div>
     </div>
   );
 }
@@ -332,7 +344,6 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
     nearbyBusinessTypeAverageRating,
     ratingHistory,
     otherLocations,
-    nearby,
     trajectory,
   } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
@@ -354,7 +365,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
               {establishment.businessType}
             </Link>
           </div>
-          <div className="text-right">
+          <div className="text-left sm:text-right">
             <Link href="/about" title="What does this rating mean?">
               <RatingBadge
                 schemeType={establishment.schemeType}
@@ -403,7 +414,6 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
 
       <RatingHistorySection history={ratingHistory} trajectory={trajectory} />
       <OtherLocationsSection locations={otherLocations} />
-      <NearbyEstablishmentsSection items={nearby} />
     </>
   );
 }
