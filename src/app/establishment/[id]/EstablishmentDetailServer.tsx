@@ -3,8 +3,9 @@ import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
 import type { EstablishmentDetailData } from "@/lib/establishment-detail";
 import { formatAddress, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
+import { getRatingMeaning } from "@/lib/rating-scale";
 import { establishmentPath } from "@/lib/slug";
-import type { Establishment, OtherLocation, RatingHistoryEntry } from "@/lib/types";
+import type { Establishment, NearbyEstablishmentSummary, OtherLocation, RatingHistoryEntry } from "@/lib/types";
 import { RatingBadge } from "@/components/RatingBadge";
 
 const NUMERIC_FHRS_VALUES = new Set(["0", "1", "2", "3", "4", "5"]);
@@ -93,6 +94,18 @@ export function DirectionsLink({ lat, lng }: { lat: number; lng: number }) {
       Directions
     </a>
   );
+}
+
+// A one-line, rating-specific explainer — what this establishment's actual score means,
+// in plain English, rather than just the bare badge. Pulled from the shared rating-scale
+// copy (see src/lib/rating-scale.ts) so it can't say something different from the About
+// page's own reference table. Renders nothing for a value that doesn't match either scale
+// (e.g. "Awaiting Publication") rather than guessing at a meaning.
+function RatingMeaningNote({ schemeType, ratingValue }: { schemeType: string; ratingValue: string }) {
+  const meaning = getRatingMeaning(schemeType, ratingValue);
+  if (!meaning) return null;
+
+  return <p className="mt-3 text-sm text-gray-700">{meaning}.</p>;
 }
 
 // A one-line comparison against the local authority's average FHRS rating — only shown
@@ -186,6 +199,37 @@ export function OtherLocationsSection({ locations }: { locations: OtherLocation[
   );
 }
 
+// Other active establishments within a mile, nearest first — server-rendered from our own
+// database (see getEstablishmentDetailData) rather than the client-fetched widget this
+// replaced, since this data isn't FSA-live-API-dependent and benefits from the same
+// crawlability fix as the rest of the page.
+export function NearbyEstablishmentsSection({ items }: { items: NearbyEstablishmentSummary[] }) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mt-6">
+      <h2 className="text-base font-semibold text-gray-900">Other places nearby</h2>
+      <ul className="mt-3 flex gap-3 overflow-x-auto pb-2">
+        {items.map((item) => (
+          <li key={item.id} className="w-56 shrink-0">
+            <Link
+              href={establishmentPath(item.fhrsId, item.businessName)}
+              className="block h-full rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+            >
+              <p className="line-clamp-2 text-sm font-semibold text-gray-900">{item.businessName}</p>
+              <p className="mt-0.5 truncate text-xs text-gray-500">{formatAddress(item)}</p>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-indigo-600">{item.distanceMiles.toFixed(1)} mi away</span>
+                <RatingBadge schemeType={item.schemeType} ratingValue={item.ratingValue} ratingDate={item.ratingDate} />
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -201,7 +245,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 // client-side fetch required — unlike the FSA-live-API extras (phone, right-to-reply,
 // score breakdown), which stay client-fetched in EstablishmentClientExtras.
 export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetailData }) {
-  const { establishment, localAuthorityAverageRating, ratingHistory, otherLocations } = detail;
+  const { establishment, localAuthorityAverageRating, ratingHistory, otherLocations, nearby } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
 
   return (
@@ -240,6 +284,8 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
           </div>
         </div>
 
+        <RatingMeaningNote schemeType={establishment.schemeType} ratingValue={establishment.ratingValue} />
+
         <dl className="mt-6 grid grid-cols-1 gap-4 border-t border-gray-100 pt-6 sm:grid-cols-2">
           <InfoRow label="Address" value={formatAddress(establishment)} />
           <div>
@@ -258,6 +304,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
 
       <RatingHistorySection history={ratingHistory} />
       <OtherLocationsSection locations={otherLocations} />
+      <NearbyEstablishmentsSection items={nearby} />
     </>
   );
 }

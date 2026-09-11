@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { buildFaqJsonLd } from "@/lib/jsonld";
+import { FHIS_SCALE, FHRS_SCALE } from "@/lib/rating-scale";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const TITLE = "About & FAQ";
@@ -13,25 +14,6 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/about` },
   openGraph: { title: TITLE, description: DESCRIPTION, url: `${SITE_URL}/about` },
 };
-
-// FHRS (England, Wales & Northern Ireland) rates on a 0-5 scale. Order matches the badge
-// colouring used elsewhere in the app: 4-5 green, 2-3 amber, 0-1 red.
-const FHRS_SCALE: { score: string; meaning: string }[] = [
-  { score: "5", meaning: "Hygiene standards are very good" },
-  { score: "4", meaning: "Hygiene standards are good" },
-  { score: "3", meaning: "Hygiene standards are generally satisfactory" },
-  { score: "2", meaning: "Some improvement is necessary" },
-  { score: "1", meaning: "Major improvement is necessary" },
-  { score: "0", meaning: "Urgent improvement is required" },
-];
-
-// FHIS (Scotland) is pass/fail rather than a numeric scale.
-const FHIS_SCALE: { score: string; meaning: string }[] = [
-  { score: "Pass", meaning: "The business meets the required food hygiene standards" },
-  { score: "Improvement Required", meaning: "The business needs to make improvements to meet the required standards" },
-  { score: "Exempt", meaning: "The business type is exempt from the scheme (e.g. very low risk)" },
-  { score: "Awaiting Inspection", meaning: "The business hasn't been inspected yet, or a report hasn't been published" },
-];
 
 // Shared between the rendered FAQ section below and its FAQPage JSON-LD — keeping one
 // source of truth means the structured data can never drift from what's actually on the

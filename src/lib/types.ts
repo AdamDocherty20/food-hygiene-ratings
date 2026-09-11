@@ -57,6 +57,22 @@ export interface OtherLocation {
   ratingDate: string | null;
 }
 
+/** A nearby establishment shown on the detail page — see src/lib/establishment-detail.ts. */
+export interface NearbyEstablishmentSummary {
+  id: number;
+  fhrsId: number;
+  businessName: string;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  addressLine3: string | null;
+  addressLine4: string | null;
+  postcode: string | null;
+  ratingValue: string;
+  schemeType: string;
+  ratingDate: string | null;
+  distanceMiles: number;
+}
+
 export interface RatingHistoryEntry {
   ratingValue: string;
   schemeType: string;

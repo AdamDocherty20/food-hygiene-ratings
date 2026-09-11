@@ -1,7 +1,11 @@
+import { Prisma } from "@/generated/prisma/client";
+import { boundingBoxDelta, distanceMilesSql } from "@/lib/geo";
 import { prisma } from "@/lib/prisma";
-import type { Establishment, OtherLocation, RatingHistoryEntry } from "@/lib/types";
+import type { Establishment, NearbyEstablishmentSummary, OtherLocation, RatingHistoryEntry } from "@/lib/types";
 
 const NUMERIC_FHRS_PATTERN = /^[0-5]$/;
+const NEARBY_RADIUS_MILES = 1;
+const NEARBY_DISPLAY_COUNT = 6;
 
 function toIsoOrNull(value: Date | null): string | null {
   return value ? value.toISOString() : null;
@@ -66,12 +70,46 @@ async function getRatingHistory(fhrsId: number): Promise<RatingHistoryEntry[]> {
   return rows.map((row) => ({ ...row, ratingDate: toIsoOrNull(row.ratingDate), recordedAt: row.recordedAt.toISOString() }));
 }
 
+/**
+ * Other active establishments within a mile, nearest first — reuses the same bounding-box
+ * pre-filter + Haversine distance formula as /api/establishments/nearby (see
+ * src/lib/geo.ts) so the two can't silently drift apart. Excludes the establishment itself
+ * directly in SQL rather than over-fetching and filtering client-side.
+ */
+async function getNearbyEstablishments(fhrsId: number, lat: number, lng: number): Promise<NearbyEstablishmentSummary[]> {
+  const { latDelta, lngDelta } = boundingBoxDelta(lat, NEARBY_RADIUS_MILES);
+  const distanceExpr = distanceMilesSql(lat, lng);
+
+  const candidates = Prisma.sql`
+    SELECT "id", "fhrsId", "businessName", "addressLine1", "addressLine2", "addressLine3", "addressLine4",
+           "postcode", "ratingValue", "schemeType", "ratingDate", ${distanceExpr} AS "distanceMiles"
+    FROM "Establishment"
+    WHERE "isActive" = true
+      AND "fhrsId" != ${fhrsId}
+      AND "latitude" IS NOT NULL
+      AND "longitude" IS NOT NULL
+      AND "latitude" BETWEEN ${lat - latDelta} AND ${lat + latDelta}
+      AND "longitude" BETWEEN ${lng - lngDelta} AND ${lng + lngDelta}
+  `;
+
+  const rows = await prisma.$queryRaw<(Omit<NearbyEstablishmentSummary, "ratingDate"> & { ratingDate: Date | null })[]>`
+    SELECT * FROM (${candidates}) "nearby"
+    WHERE "nearby"."distanceMiles" <= ${NEARBY_RADIUS_MILES}
+    ORDER BY "nearby"."distanceMiles" ASC
+    LIMIT ${NEARBY_DISPLAY_COUNT}
+  `;
+
+  return rows.map((row) => ({ ...row, ratingDate: toIsoOrNull(row.ratingDate) }));
+}
+
 export interface EstablishmentDetailData {
   establishment: Establishment;
   /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
   localAuthorityAverageRating: number | null;
   otherLocations: OtherLocation[];
   ratingHistory: RatingHistoryEntry[];
+  /** Other active establishments within a mile, nearest first — empty if no coordinates. */
+  nearby: NearbyEstablishmentSummary[];
 }
 
 /**
@@ -89,11 +127,15 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
   if (!establishment) return null;
 
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_PATTERN.test(establishment.ratingValue);
+  const { latitude, longitude } = establishment;
 
-  const [localAuthorityAverageRating, otherLocations, ratingHistory] = await Promise.all([
+  const [localAuthorityAverageRating, otherLocations, ratingHistory, nearby] = await Promise.all([
     isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
     getOtherLocations(establishment.businessName, establishment.fhrsId),
     getRatingHistory(establishment.fhrsId),
+    latitude !== null && longitude !== null
+      ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude)
+      : Promise.resolve([]),
   ]);
 
   return {
@@ -107,5 +149,6 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
     localAuthorityAverageRating,
     otherLocations,
     ratingHistory,
+    nearby,
   };
 }

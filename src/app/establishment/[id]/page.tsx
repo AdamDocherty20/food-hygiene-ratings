@@ -5,11 +5,10 @@ import { EstablishmentClientExtras } from "./EstablishmentClientExtras";
 import { BackLink, DirectionsLink, EstablishmentDetailHero } from "./EstablishmentDetailServer";
 import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
-import { NearbyEstablishments } from "@/components/NearbyEstablishments";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { getEstablishmentDetailData } from "@/lib/establishment-detail";
-import { humanizeStatus, toEstablishmentSummary } from "@/lib/format";
+import { formatRatingDate, humanizeStatus, toEstablishmentSummary } from "@/lib/format";
 import { buildBreadcrumbJsonLd, buildEstablishmentJsonLd } from "@/lib/jsonld";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { establishmentPath, parseFhrsIdParam } from "@/lib/slug";
@@ -46,11 +45,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return { title: FALLBACK_TITLE };
   }
 
-  const canonicalUrl = `${SITE_URL}${establishmentPath(detail.establishment.fhrsId, detail.establishment.businessName)}`;
+  const { establishment } = detail;
+  const canonicalUrl = `${SITE_URL}${establishmentPath(establishment.fhrsId, establishment.businessName)}`;
+
+  const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
+  const ratingText = isNumericFhrs ? `${establishment.ratingValue}/5` : humanizeStatus(establishment.ratingValue);
+  const inspectedText = establishment.ratingDate ? `, last inspected ${formatRatingDate(establishment.ratingDate)}` : "";
+  const title = `${establishment.businessName} Hygiene Rating | ${SITE_NAME}`;
+  const description = `Check the official FSA food hygiene rating for ${establishment.businessName} in ${establishment.localAuthorityName} — rated ${ratingText}${inspectedText}.`;
 
   return {
-    title: `${detail.establishment.businessName} Hygiene Rating | ${SITE_NAME}`,
+    title,
+    description,
     alternates: { canonical: canonicalUrl },
+    openGraph: { title, description, url: canonicalUrl },
   };
 }
 
@@ -132,10 +140,6 @@ export default async function EstablishmentDetailPage({ params }: { params: Prom
       )}
 
       <EstablishmentClientExtras fhrsId={establishment.fhrsId} summary={toEstablishmentSummary(establishment)} />
-
-      {establishment.latitude !== null && establishment.longitude !== null && (
-        <NearbyEstablishments fhrsId={establishment.fhrsId} lat={establishment.latitude} lng={establishment.longitude} />
-      )}
     </div>
   );
 }
