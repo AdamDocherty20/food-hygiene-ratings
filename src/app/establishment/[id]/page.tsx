@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import { EstablishmentDetailClient } from "./EstablishmentDetailClient";
 import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
 import { buildBreadcrumbJsonLd, buildEstablishmentJsonLd } from "@/lib/jsonld";
@@ -10,9 +11,11 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const SITE_NAME = "Should I Eat Here";
 const FALLBACK_TITLE = `Establishment Hygiene Rating | ${SITE_NAME}`;
 
-// Selects everything generateMetadata and the JSON-LD builder need, in one shared shape —
-// both run independently (Next.js does not share data between generateMetadata and the
-// page body), so each does its own minimal Prisma query using this same select.
+// Ratings only change on the daily FSA sync, so an hour of staleness is a non-issue and
+// buys a large cut in DB reads — matches the revalidate window already used on /area pages.
+export const revalidate = 3600;
+
+// Selects everything generateMetadata and the JSON-LD builder need, in one shared shape.
 const JSON_LD_SELECT = {
   fhrsId: true,
   businessName: true,
@@ -31,6 +34,15 @@ const JSON_LD_SELECT = {
   localAuthorityName: true,
 } as const;
 
+// Next.js runs generateMetadata and the page body as two independent functions, so without
+// this they'd each issue their own Prisma query for the same row on every request — doubling
+// DB reads (and, at 611k crawlable establishment pages, doubling egress). Wrapping in React's
+// `cache()` dedupes same-argument calls within a single request, so both call sites share one
+// query. Combined with `revalidate` above, repeat visits within the hour hit neither DB call.
+const getEstablishmentForJsonLd = cache(async (fhrsId: number) =>
+  prisma.establishment.findFirst({ where: { fhrsId, isActive: true }, select: JSON_LD_SELECT }),
+);
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const fhrsId = Number(parseFhrsIdParam(id));
@@ -39,10 +51,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return { title: FALLBACK_TITLE };
   }
 
-  const establishment = await prisma.establishment.findFirst({
-    where: { fhrsId, isActive: true },
-    select: { businessName: true },
-  });
+  const establishment = await getEstablishmentForJsonLd(fhrsId);
 
   if (!establishment) {
     return { title: FALLBACK_TITLE };
@@ -55,9 +64,7 @@ export default async function EstablishmentDetailPage({ params }: { params: Prom
   const { id } = await params;
   const fhrsId = Number(parseFhrsIdParam(id));
 
-  const establishment = Number.isInteger(fhrsId)
-    ? await prisma.establishment.findFirst({ where: { fhrsId, isActive: true }, select: JSON_LD_SELECT })
-    : null;
+  const establishment = Number.isInteger(fhrsId) ? await getEstablishmentForJsonLd(fhrsId) : null;
 
   let breadcrumbJsonLd = null;
   if (establishment) {
