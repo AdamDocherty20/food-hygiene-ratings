@@ -1,11 +1,14 @@
 import { Prisma } from "@/generated/prisma/client";
 import { boundingBoxDelta, distanceMilesSql } from "@/lib/geo";
 import { prisma } from "@/lib/prisma";
+import { computeRatingTrajectory, type RatingTrajectory } from "@/lib/rating-trajectory";
 import type { Establishment, NearbyEstablishmentSummary, OtherLocation, RatingHistoryEntry } from "@/lib/types";
 
 const NUMERIC_FHRS_PATTERN = /^[0-5]$/;
 const NEARBY_RADIUS_MILES = 1;
 const NEARBY_DISPLAY_COUNT = 6;
+// ~5km, matching the app's existing mile-based "nearby" convention rather than mixing units.
+const BUSINESS_TYPE_RADIUS_MILES = 3;
 
 function toIsoOrNull(value: Date | null): string | null {
   return value ? value.toISOString() : null;
@@ -28,6 +31,39 @@ async function getLocalAuthorityAverageRating(localAuthorityCode: string): Promi
       AND "schemeType" = 'FHRS'
       AND "ratingValue" ~ '^[0-5]$'
       AND "localAuthorityCode" = ${localAuthorityCode}
+  `;
+  const avg = rows[0]?.avg;
+  return typeof avg === "number" ? Math.round(avg * 10) / 10 : null;
+}
+
+/**
+ * Average numeric FHRS rating among other active establishments of the *same FSA business
+ * type* within a few miles — a narrower, more like-for-like comparison than the local
+ * authority average above (a takeaway compared against other takeaways nearby, not against
+ * every food business in the borough). Same bounding-box + Haversine pattern as
+ * getNearbyEstablishments; only meaningful for numeric FHRS, same as the authority average.
+ */
+async function getNearbyBusinessTypeAverageRating(businessTypeId: number, lat: number, lng: number): Promise<number | null> {
+  const { latDelta, lngDelta } = boundingBoxDelta(lat, BUSINESS_TYPE_RADIUS_MILES);
+  const distanceExpr = distanceMilesSql(lat, lng);
+
+  const candidates = Prisma.sql`
+    SELECT "ratingValue", ${distanceExpr} AS "distanceMiles"
+    FROM "Establishment"
+    WHERE "isActive" = true
+      AND "schemeType" = 'FHRS'
+      AND "ratingValue" ~ '^[0-5]$'
+      AND "businessTypeId" = ${businessTypeId}
+      AND "latitude" IS NOT NULL
+      AND "longitude" IS NOT NULL
+      AND "latitude" BETWEEN ${lat - latDelta} AND ${lat + latDelta}
+      AND "longitude" BETWEEN ${lng - lngDelta} AND ${lng + lngDelta}
+  `;
+
+  const rows = await prisma.$queryRaw<{ avg: number | null }[]>`
+    SELECT AVG(("ratingValue")::int)::float8 AS avg
+    FROM (${candidates}) "nearby"
+    WHERE "nearby"."distanceMiles" <= ${BUSINESS_TYPE_RADIUS_MILES}
   `;
   const avg = rows[0]?.avg;
   return typeof avg === "number" ? Math.round(avg * 10) / 10 : null;
@@ -106,10 +142,14 @@ export interface EstablishmentDetailData {
   establishment: Establishment;
   /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
   localAuthorityAverageRating: number | null;
+  /** Average FHRS rating for the same business type within ~3 miles, or null likewise. */
+  nearbyBusinessTypeAverageRating: number | null;
   otherLocations: OtherLocation[];
   ratingHistory: RatingHistoryEntry[];
   /** Other active establishments within a mile, nearest first — empty if no coordinates. */
   nearby: NearbyEstablishmentSummary[];
+  /** Derived from ratingHistory — see src/lib/rating-trajectory.ts. */
+  trajectory: RatingTrajectory;
 }
 
 /**
@@ -128,14 +168,16 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
 
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_PATTERN.test(establishment.ratingValue);
   const { latitude, longitude } = establishment;
+  const hasCoords = latitude !== null && longitude !== null;
 
-  const [localAuthorityAverageRating, otherLocations, ratingHistory, nearby] = await Promise.all([
+  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby] = await Promise.all([
     isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
+    isNumericFhrs && hasCoords
+      ? getNearbyBusinessTypeAverageRating(establishment.businessTypeId, latitude, longitude)
+      : Promise.resolve(null),
     getOtherLocations(establishment.businessName, establishment.fhrsId),
     getRatingHistory(establishment.fhrsId),
-    latitude !== null && longitude !== null
-      ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude)
-      : Promise.resolve([]),
+    hasCoords ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude) : Promise.resolve([]),
   ]);
 
   return {
@@ -147,8 +189,10 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
       updatedAt: establishment.updatedAt.toISOString(),
     },
     localAuthorityAverageRating,
+    nearbyBusinessTypeAverageRating,
     otherLocations,
     ratingHistory,
     nearby,
+    trajectory: computeRatingTrajectory(toIsoOrNull(establishment.ratingDate), ratingHistory),
   };
 }

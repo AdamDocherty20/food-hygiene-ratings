@@ -4,6 +4,7 @@ import type { EstablishmentDetailData } from "@/lib/establishment-detail";
 import { formatAddress, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { getRatingMeaning } from "@/lib/rating-scale";
+import type { RatingTrajectory } from "@/lib/rating-trajectory";
 import { establishmentPath } from "@/lib/slug";
 import type { Establishment, NearbyEstablishmentSummary, OtherLocation, RatingHistoryEntry } from "@/lib/types";
 import { RatingBadge } from "@/components/RatingBadge";
@@ -140,15 +141,95 @@ function AverageRatingNote({
   );
 }
 
+// A one-line comparison against the average FHRS rating for the same business type within
+// ~3 miles — a narrower, more like-for-like comparison than the local-authority-wide
+// average above (see getNearbyBusinessTypeAverageRating).
+function NearbyTypeAverageNote({
+  ratingValue,
+  average,
+  businessType,
+}: {
+  ratingValue: number;
+  average: number;
+  businessType: string;
+}) {
+  const diff = ratingValue - average;
+  const comparison =
+    Math.abs(diff) < 0.05
+      ? `matches the average of ${average.toFixed(1)}`
+      : diff > 0
+        ? `above the average of ${average.toFixed(1)}`
+        : `below the average of ${average.toFixed(1)}`;
+
+  return (
+    <p className="mt-1 text-xs text-gray-500">
+      It&apos;s {comparison} for {businessType.toLowerCase()} within 3 miles.
+    </p>
+  );
+}
+
+// A heads-up when the last inspection was over ~2 years ago — the badge above still shows
+// the last published rating, but it's worth being upfront that it may no longer reflect
+// current standards. See computeRatingTrajectory in src/lib/rating-trajectory.ts.
+function StaleInspectionNote({ daysSinceLastInspection }: { daysSinceLastInspection: number }) {
+  const years = Math.floor(daysSinceLastInspection / 365);
+  const yearsText = years >= 1 ? `${years} year${years === 1 ? "" : "s"}` : `${daysSinceLastInspection} days`;
+
+  return (
+    <p className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+      <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      It&apos;s been over {yearsText} since the last inspection — standards may have changed since then.
+    </p>
+  );
+}
+
+// A one-line summary of the direction of travel ("Improved from 3/5 to 5/5" or "Rated 5/5
+// for the last 3 inspections in a row"), built from the same derived data as the timeline
+// below rather than restating it — see computeRatingTrajectory.
+function TrajectorySummary({ trajectory, currentLabel }: { trajectory: RatingTrajectory; currentLabel: string }) {
+  if (trajectory.direction && trajectory.previousRatingLabel) {
+    const verb = trajectory.direction === "improved" ? "Improved" : "Declined";
+    const streak =
+      trajectory.consecutiveAtCurrentRating > 1 ? `, and has held for ${trajectory.consecutiveAtCurrentRating} inspections since` : "";
+    return (
+      <p className="text-xs text-gray-500">
+        {verb} from {trajectory.previousRatingLabel} to {currentLabel}
+        {streak}.
+      </p>
+    );
+  }
+
+  if (trajectory.consecutiveAtCurrentRating > 1) {
+    return (
+      <p className="text-xs text-gray-500">
+        Rated {currentLabel} for the last {trajectory.consecutiveAtCurrentRating} inspections in a row.
+      </p>
+    );
+  }
+
+  return null;
+}
+
 // A short "improved/declined/steady" timeline built from RatingHistory rows. Only rendered
 // when there's more than one entry — a single entry is just the establishment's first-seen
 // rating and isn't a "history" yet.
-export function RatingHistorySection({ history }: { history: RatingHistoryEntry[] }) {
+export function RatingHistorySection({ history, trajectory }: { history: RatingHistoryEntry[]; trajectory: RatingTrajectory }) {
   if (history.length < 2) return null;
+
+  const current = history[0];
+  const currentLabel =
+    current.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(current.ratingValue)
+      ? `${current.ratingValue}/5`
+      : humanizeStatus(current.ratingValue);
 
   return (
     <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
       <h2 className="text-sm font-semibold text-gray-900">Rating history</h2>
+      <div className="mt-1">
+        <TrajectorySummary trajectory={trajectory} currentLabel={currentLabel} />
+      </div>
       <ol className="mt-4 space-y-3 border-l-2 border-gray-100 pl-4">
         {history.map((entry, index) => (
           <li key={`${entry.recordedAt}-${index}`} className="relative">
@@ -245,7 +326,15 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 // client-side fetch required — unlike the FSA-live-API extras (phone, right-to-reply,
 // score breakdown), which stay client-fetched in EstablishmentClientExtras.
 export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetailData }) {
-  const { establishment, localAuthorityAverageRating, ratingHistory, otherLocations, nearby } = detail;
+  const {
+    establishment,
+    localAuthorityAverageRating,
+    nearbyBusinessTypeAverageRating,
+    ratingHistory,
+    otherLocations,
+    nearby,
+    trajectory,
+  } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
 
   return (
@@ -281,10 +370,20 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
                 localAuthorityName={establishment.localAuthorityName}
               />
             )}
+            {isNumericFhrs && nearbyBusinessTypeAverageRating !== null && (
+              <NearbyTypeAverageNote
+                ratingValue={Number(establishment.ratingValue)}
+                average={nearbyBusinessTypeAverageRating}
+                businessType={establishment.businessType}
+              />
+            )}
           </div>
         </div>
 
         <RatingMeaningNote schemeType={establishment.schemeType} ratingValue={establishment.ratingValue} />
+        {trajectory.staleInspection && trajectory.daysSinceLastInspection !== null && (
+          <StaleInspectionNote daysSinceLastInspection={trajectory.daysSinceLastInspection} />
+        )}
 
         <dl className="mt-6 grid grid-cols-1 gap-4 border-t border-gray-100 pt-6 sm:grid-cols-2">
           <InfoRow label="Address" value={formatAddress(establishment)} />
@@ -302,7 +401,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
         </dl>
       </div>
 
-      <RatingHistorySection history={ratingHistory} />
+      <RatingHistorySection history={ratingHistory} trajectory={trajectory} />
       <OtherLocationsSection locations={otherLocations} />
       <NearbyEstablishmentsSection items={nearby} />
     </>
