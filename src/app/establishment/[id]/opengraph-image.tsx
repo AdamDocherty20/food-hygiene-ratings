@@ -7,6 +7,15 @@ export const alt = "Food hygiene rating";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// This route had no caching at all — every request (including repeat ones for the exact
+// same establishment) re-queried the DB and re-rendered a fresh PNG from scratch. Social
+// platforms, link-preview bots and crawlers fetch OG images automatically whenever a page
+// is linked or crawled, so across 611k+ establishment pages this was a major contributor
+// to Vercel's Function Invocation and Fast Origin Transfer limits. Matches the revalidate
+// window already used on the establishment page itself — ratings only change on the daily
+// FSA sync, so an hour of image staleness is a non-issue.
+export const revalidate = 3600;
+
 const NUMERIC_FHRS_VALUES = new Set(["0", "1", "2", "3", "4", "5"]);
 
 // Re-implements RatingBadge's colour logic with plain hex values — Satori (the renderer

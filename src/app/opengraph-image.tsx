@@ -4,6 +4,11 @@ export const alt = "Should I Eat Here — UK food hygiene ratings";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// Fully static content with no dynamic params — but with no revalidate set, this was still
+// being regenerated from scratch on every request instead of served from cache. A long
+// window is safe since nothing here ever changes.
+export const revalidate = 86400;
+
 // The default share-preview image for the site (used by the homepage and any page that
 // doesn't define its own opengraph-image, e.g. establishment pages override this with
 // one showing the specific business). Rendered at request time via Satori (next/og),
