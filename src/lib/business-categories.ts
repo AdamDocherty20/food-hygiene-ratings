@@ -39,3 +39,13 @@ export function getBusinessCategoryBySlug(slug: string): BusinessCategory | null
 export function getBusinessCategoryByTypeId(businessTypeId: number): BusinessCategory | null {
   return BY_TYPE_ID.get(businessTypeId) ?? null;
 }
+
+// The placeholder card image for an establishment — see public/categories/ (one representative
+// stock photo per category, sourced from Pexels under its free commercial-use licence, plus a
+// generic fallback for the businessTypeIds excluded from BUSINESS_CATEGORIES above). Not a photo
+// of the actual place — establishments don't have real photos yet — but a real, honest photo of
+// the kind of venue this is, rather than a broken image or the same photo everywhere.
+export function getCategoryImagePath(businessTypeId: number): string {
+  const category = getBusinessCategoryByTypeId(businessTypeId);
+  return `/categories/${category?.slug ?? "generic"}.jpg`;
+}

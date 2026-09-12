@@ -13,6 +13,7 @@ export interface AreaEstablishment {
   fhrsId: number;
   businessName: string;
   businessType: string;
+  businessTypeId: number;
   addressLine1: string | null;
   addressLine2: string | null;
   addressLine3: string | null;
@@ -58,7 +59,7 @@ export async function getTopRatedInArea(
 
   const [establishments, total] = await Promise.all([
     prisma.$queryRaw<AreaEstablishment[]>`
-      SELECT "fhrsId", "businessName", "businessType", "addressLine1", "addressLine2", "addressLine3", "addressLine4",
+      SELECT "fhrsId", "businessName", "businessType", "businessTypeId", "addressLine1", "addressLine2", "addressLine3", "addressLine4",
              "postcode", "ratingValue", "ratingDate", "schemeType"
       FROM "Establishment"
       WHERE ${whereClause}
