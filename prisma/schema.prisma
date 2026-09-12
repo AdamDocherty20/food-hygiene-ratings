@@ -79,3 +79,37 @@ model RatingHistory {
 
   @@index([fhrsId, recordedAt])
 }
+
+// One row per FSA establishment successfully matched against a Companies House company —
+// written by scripts/match-companies-house.ts. Deliberately holds only the match *result*
+// (a handful of fields), not the full ~5.5m-row Companies House register: the free monthly
+// snapshot is small enough (469MB zipped) to re-download and re-process from scratch on
+// every run instead of persisting it, which keeps this table (and the free-tier DB storage
+// it uses) proportional to our own 600k+ establishments rather than the whole UK register.
+// Re-tuning the matching logic means re-running the script, not a bigger backfill.
+//
+// Only HIGH and MEDIUM confidence matches are ever surfaced as page content — see
+// `publishable`. LOW is kept for analysis but never shown to a visitor as fact.
+model CompanyMatch {
+  id Int @id @default(autoincrement())
+
+  fhrsId Int @unique
+
+  companyNumber     String
+  companyName       String
+  incorporationDate DateTime?
+  companyStatus     String?
+  sicCodes          String[]
+
+  // "HIGH" | "MEDIUM" | "LOW" — see scripts/match-companies-house.ts for the exact rules.
+  matchConfidence String
+  publishable     Boolean
+
+  source      String
+  licence     String
+  retrievedAt DateTime
+
+  matchedAt DateTime @default(now())
+
+  @@index([matchConfidence])
+}

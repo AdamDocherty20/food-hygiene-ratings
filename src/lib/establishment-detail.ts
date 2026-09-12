@@ -138,6 +138,27 @@ async function getNearbyEstablishments(fhrsId: number, lat: number, lng: number)
   return rows.map((row) => ({ ...row, ratingDate: toIsoOrNull(row.ratingDate) }));
 }
 
+export interface CompanyInfo {
+  companyNumber: string;
+  incorporationDate: string | null;
+  companyStatus: string | null;
+  matchConfidence: string;
+}
+
+/**
+ * The Companies House match for this establishment, if any — see
+ * scripts/match-companies-house.ts. Only ever returns a HIGH/MEDIUM (`publishable`) match;
+ * LOW-confidence matches exist only for analysis and are never surfaced on the page.
+ */
+async function getCompanyInfo(fhrsId: number): Promise<CompanyInfo | null> {
+  const match = await prisma.companyMatch.findUnique({
+    where: { fhrsId, publishable: true },
+    select: { companyNumber: true, incorporationDate: true, companyStatus: true, matchConfidence: true },
+  });
+  if (!match) return null;
+  return { ...match, incorporationDate: toIsoOrNull(match.incorporationDate) };
+}
+
 export interface EstablishmentDetailData {
   establishment: Establishment;
   /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
@@ -150,6 +171,8 @@ export interface EstablishmentDetailData {
   nearby: NearbyEstablishmentSummary[];
   /** Derived from ratingHistory — see src/lib/rating-trajectory.ts. */
   trajectory: RatingTrajectory;
+  /** Companies House match, if any — see getCompanyInfo. */
+  company: CompanyInfo | null;
 }
 
 /**
@@ -170,15 +193,17 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
   const { latitude, longitude } = establishment;
   const hasCoords = latitude !== null && longitude !== null;
 
-  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby] = await Promise.all([
-    isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
-    isNumericFhrs && hasCoords
-      ? getNearbyBusinessTypeAverageRating(establishment.businessTypeId, latitude, longitude)
-      : Promise.resolve(null),
-    getOtherLocations(establishment.businessName, establishment.fhrsId),
-    getRatingHistory(establishment.fhrsId),
-    hasCoords ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude) : Promise.resolve([]),
-  ]);
+  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company] =
+    await Promise.all([
+      isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
+      isNumericFhrs && hasCoords
+        ? getNearbyBusinessTypeAverageRating(establishment.businessTypeId, latitude, longitude)
+        : Promise.resolve(null),
+      getOtherLocations(establishment.businessName, establishment.fhrsId),
+      getRatingHistory(establishment.fhrsId),
+      hasCoords ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude) : Promise.resolve([]),
+      getCompanyInfo(establishment.fhrsId),
+    ]);
 
   return {
     establishment: {
@@ -194,5 +219,6 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
     ratingHistory,
     nearby,
     trajectory: computeRatingTrajectory(toIsoOrNull(establishment.ratingDate), ratingHistory),
+    company,
   };
 }

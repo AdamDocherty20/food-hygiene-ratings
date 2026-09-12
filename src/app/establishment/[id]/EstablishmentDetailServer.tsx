@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
-import type { EstablishmentDetailData } from "@/lib/establishment-detail";
-import { formatAddress, formatRatingDate, humanizeStatus } from "@/lib/format";
+import type { CompanyInfo, EstablishmentDetailData } from "@/lib/establishment-detail";
+import { formatAddress, formatDate, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { getRatingBand, getRatingMeaning } from "@/lib/rating-scale";
 import type { RatingTrajectory } from "@/lib/rating-trajectory";
@@ -279,6 +279,34 @@ export function OtherLocationsSection({ locations }: { locations: OtherLocation[
   );
 }
 
+// A "trading since" fact sourced from Companies House (see scripts/match-companies-house.ts)
+// — only rendered for HIGH/MEDIUM-confidence matches (LOW-confidence matches are stored for
+// analysis but never surfaced here). Deliberately shows only the incorporation date, not
+// company status: a MEDIUM-confidence match is occasionally the wrong company, and a status
+// like "Dissolved" sitting next to an establishment the FSA lists as active would read as a
+// confusing, possibly wrong claim about a real business — the incorporation date alone is a
+// safe, low-risk fact even when the match is imperfect. Links through to the real Companies
+// House filing so the claim is independently checkable.
+function CompanyInfoNote({ company }: { company: CompanyInfo }) {
+  const incorporated = formatDate(company.incorporationDate);
+  if (!incorporated) return null;
+
+  return (
+    <p className="mt-6 border-t border-gray-100 pt-4 text-xs text-gray-500">
+      Trading since {incorporated}, per{" "}
+      <a
+        href={`https://find-and-update.company-information.service.gov.uk/company/${company.companyNumber}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-indigo-600 hover:underline"
+      >
+        Companies House
+      </a>
+      .
+    </p>
+  );
+}
+
 // Other active establishments within a mile, nearest first — server-rendered from our own
 // database (see getEstablishmentDetailData) rather than the client-fetched widget this
 // replaced, since this data isn't FSA-live-API-dependent and benefits from the same
@@ -341,6 +369,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
     ratingHistory,
     otherLocations,
     trajectory,
+    company,
   } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
 
@@ -406,6 +435,8 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
             </dd>
           </div>
         </dl>
+
+        {company && <CompanyInfoNote company={company} />}
       </div>
 
       <RatingHistorySection history={ratingHistory} trajectory={trajectory} />
