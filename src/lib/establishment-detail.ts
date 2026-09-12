@@ -181,6 +181,48 @@ async function getChainInfo(fhrsId: number): Promise<ChainInfo | null> {
   return { ...match, foundedDate: toIsoOrNull(match.foundedDate) };
 }
 
+export interface OsmInfo {
+  matchMethod: string;
+  cuisine: string | null;
+  openingHours: string | null;
+  takeaway: string | null;
+  delivery: string | null;
+  outdoorSeating: string | null;
+  wheelchair: string | null;
+  dietVegan: string | null;
+  dietVegetarian: string | null;
+  dietHalal: string | null;
+  website: string | null;
+  phone: string | null;
+}
+
+/**
+ * The OpenStreetMap match for this establishment, if any — see scripts/match-osm.ts.
+ * Unlike the other sources, OSM's ODbL licence carries a real attribution *requirement*,
+ * not just a courtesy — any UI rendering these fields must show the attribution line (see
+ * OsmInfoSection in EstablishmentDetailServer.tsx).
+ */
+async function getOsmInfo(fhrsId: number): Promise<OsmInfo | null> {
+  const match = await prisma.osmMatch.findUnique({
+    where: { fhrsId },
+    select: {
+      matchMethod: true,
+      cuisine: true,
+      openingHours: true,
+      takeaway: true,
+      delivery: true,
+      outdoorSeating: true,
+      wheelchair: true,
+      dietVegan: true,
+      dietVegetarian: true,
+      dietHalal: true,
+      website: true,
+      phone: true,
+    },
+  });
+  return match;
+}
+
 export interface EstablishmentDetailData {
   establishment: Establishment;
   /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
@@ -197,6 +239,8 @@ export interface EstablishmentDetailData {
   company: CompanyInfo | null;
   /** Wikidata chain match, if any — see getChainInfo. */
   chain: ChainInfo | null;
+  /** OpenStreetMap match, if any — see getOsmInfo. */
+  osm: OsmInfo | null;
 }
 
 /**
@@ -217,7 +261,7 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
   const { latitude, longitude } = establishment;
   const hasCoords = latitude !== null && longitude !== null;
 
-  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company, chain] =
+  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company, chain, osm] =
     await Promise.all([
       isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
       isNumericFhrs && hasCoords
@@ -228,6 +272,7 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
       hasCoords ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude) : Promise.resolve([]),
       getCompanyInfo(establishment.fhrsId),
       getChainInfo(establishment.fhrsId),
+      getOsmInfo(establishment.fhrsId),
     ]);
 
   return {
@@ -246,5 +291,6 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
     trajectory: computeRatingTrajectory(toIsoOrNull(establishment.ratingDate), ratingHistory),
     company,
     chain,
+    osm,
   };
 }

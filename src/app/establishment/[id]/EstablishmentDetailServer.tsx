@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
-import type { ChainInfo, CompanyInfo, EstablishmentDetailData } from "@/lib/establishment-detail";
+import type { ChainInfo, CompanyInfo, EstablishmentDetailData, OsmInfo } from "@/lib/establishment-detail";
 import { formatAddress, formatDate, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { getRatingBand, getRatingMeaning } from "@/lib/rating-scale";
@@ -279,6 +279,79 @@ export function OtherLocationsSection({ locations }: { locations: OtherLocation[
   );
 }
 
+// Yes/no/limited-style OSM tag values rendered as a short readable label, or null to hide
+// the row entirely — "no" is rarely worth stating as a fact ("Delivery: no" reads oddly),
+// so only genuinely informative values are shown.
+function tagLabel(value: string | null, labels: Record<string, string>): string | null {
+  if (!value) return null;
+  return labels[value] ?? null;
+}
+
+// A small facts card sourced from OpenStreetMap (see scripts/match-osm.ts) — cuisine,
+// opening hours, dietary options, accessibility, website. ODbL is a real attribution
+// *requirement* here (unlike Companies House/Wikidata's "no obligation, but attribute
+// anyway"), so the attribution line at the bottom isn't optional.
+function OsmInfoSection({ osm }: { osm: OsmInfo }) {
+  const facts: { label: string; value: string }[] = [];
+  if (osm.cuisine) facts.push({ label: "Cuisine", value: osm.cuisine.split(";").join(", ").replace(/_/g, " ") });
+  if (osm.openingHours) facts.push({ label: "Opening hours", value: osm.openingHours });
+
+  const takeaway = tagLabel(osm.takeaway, { yes: "Yes", only: "Takeaway only" });
+  if (takeaway) facts.push({ label: "Takeaway", value: takeaway });
+  const delivery = tagLabel(osm.delivery, { yes: "Yes" });
+  if (delivery) facts.push({ label: "Delivery", value: delivery });
+  const outdoorSeating = tagLabel(osm.outdoorSeating, { yes: "Yes" });
+  if (outdoorSeating) facts.push({ label: "Outdoor seating", value: outdoorSeating });
+  const wheelchair = tagLabel(osm.wheelchair, { yes: "Fully accessible", limited: "Limited access" });
+  if (wheelchair) facts.push({ label: "Wheelchair access", value: wheelchair });
+
+  const dietary = [
+    tagLabel(osm.dietVegan, { yes: "Vegan", only: "Vegan only" }),
+    tagLabel(osm.dietVegetarian, { yes: "Vegetarian", only: "Vegetarian only" }),
+    tagLabel(osm.dietHalal, { yes: "Halal", only: "Halal only" }),
+  ].filter((v): v is string => v !== null);
+  if (dietary.length > 0) facts.push({ label: "Dietary options", value: dietary.join(", ") });
+
+  if (osm.website) facts.push({ label: "Website", value: osm.website });
+  if (osm.phone) facts.push({ label: "Phone", value: osm.phone });
+
+  if (facts.length === 0) return null;
+
+  return (
+    <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <h2 className="text-sm font-semibold text-gray-900">More about this place</h2>
+      <dl className="mt-4 space-y-2">
+        {facts.map((fact) => (
+          <div key={fact.label} className="flex flex-col gap-0.5 text-sm sm:flex-row sm:gap-2">
+            <dt className="shrink-0 font-medium text-gray-700 sm:w-36">{fact.label}</dt>
+            <dd className="text-gray-600">
+              {fact.label === "Website" ? (
+                <a href={fact.value} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                  {fact.value}
+                </a>
+              ) : (
+                fact.value
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-4 text-xs text-gray-400">
+        Map data from{" "}
+        <a
+          href="https://www.openstreetmap.org/copyright"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-indigo-600 hover:underline"
+        >
+          OpenStreetMap contributors
+        </a>
+        , ODbL.
+      </p>
+    </div>
+  );
+}
+
 // A "trading since" fact sourced from Companies House (see scripts/match-companies-house.ts)
 // — only rendered for HIGH/MEDIUM-confidence matches (LOW-confidence matches are stored for
 // analysis but never surfaced here). Deliberately shows only the incorporation date, not
@@ -403,6 +476,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
     trajectory,
     company,
     chain,
+    osm,
   } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
 
@@ -475,6 +549,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
 
       <RatingHistorySection history={ratingHistory} trajectory={trajectory} />
       <OtherLocationsSection locations={otherLocations} />
+      {osm && <OsmInfoSection osm={osm} />}
     </>
   );
 }

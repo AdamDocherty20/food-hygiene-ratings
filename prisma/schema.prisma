@@ -141,3 +141,52 @@ model ChainMatch {
 
   matchedAt DateTime @default(now())
 }
+
+// One row per FSA establishment matched to an OpenStreetMap point — written by
+// scripts/match-osm.ts, from Geofabrik's Great Britain extract filtered with osmium
+// (see that script for why: the live Overpass API proved unreliable for bulk country-wide
+// queries even scoped to one tag).
+//
+// Two distinct match methods, tracked in `matchMethod`:
+//   "fhrs_id" — the OSM point already carries the FSA's own fhrs:id tag (mappers
+//               cross-reference this directly) — exact, unambiguous, ~49% of tagged points.
+//   "spatial" — the brief's original approach for everything else: nearest named point
+//               within 75m, disambiguated by name similarity. distanceMeters/nameScore are
+//               only populated for this method, so the threshold can be retuned later
+//               without re-running the whole match, per the brief.
+//
+// Licence is ODbL, which (unlike Companies House/Wikidata) carries a real attribution
+// *requirement*, not just a courtesy — the site must render an attribution line on any
+// page using these fields.
+model OsmMatch {
+  id Int @id @default(autoincrement())
+
+  fhrsId Int @unique
+
+  osmType String
+  osmId   BigInt
+
+  matchMethod    String
+  distanceMeters Float?
+  nameScore      Int?
+
+  cuisine        String?
+  openingHours   String?
+  takeaway       String?
+  delivery       String?
+  outdoorSeating String?
+  wheelchair     String?
+  dietVegan      String?
+  dietVegetarian String?
+  dietHalal      String?
+  website        String?
+  phone          String?
+
+  source      String
+  licence     String
+  retrievedAt DateTime
+
+  matchedAt DateTime @default(now())
+
+  @@index([matchMethod])
+}
