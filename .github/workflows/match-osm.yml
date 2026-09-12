@@ -1,0 +1,56 @@
+name: Match OpenStreetMap
+
+# Runs the OSM matching pipeline on a schedule to keep cuisine/opening-hours/accessibility
+# facts current. See scripts/match-osm.ts for why this downloads Geofabrik's Great Britain
+# extract and filters it with osmium-tool rather than querying the live Overpass API in
+# bulk — that was tried first and proved unreliable even for a single tag.
+#
+# osmium-tool is a system package (not an npm dependency), installed fresh each run via
+# apt — this is the one workflow in this repo with a non-npm dependency, for that reason.
+# Requires a DATABASE_URL secret pointed at the same Postgres database the app uses (see
+# README "Deploying") — same secret the FSA sync (sync.yml) already uses.
+on:
+  schedule:
+    # 05:00 UTC on the 2nd of the month — after the Companies House and Wikidata matches;
+    # this is the slowest of the three (a ~2GB download), so it gets the most runway.
+    - cron: "0 5 2 * *"
+  workflow_dispatch: {}
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - name: Install osmium-tool
+        run: sudo apt-get update && sudo apt-get install -y osmium-tool
+
+      - name: Download Great Britain OSM extract
+        run: |
+          curl -sL -o gb.osm.pbf "https://download.geofabrik.de/europe/great-britain-latest.osm.pbf" \
+            -H "User-Agent: ShouldIEatHere/1.0 (https://adamdocherty.com; food hygiene rating site)"
+
+      - name: Filter to target tags
+        run: |
+          osmium tags-filter gb.osm.pbf \
+            amenity=restaurant,cafe,fast_food,pub,bar,food_court,nursing_home,childcare \
+            shop=bakery,butcher,greengrocer,supermarket,convenience,deli \
+            tourism=hotel,guest_house \
+            -o filtered.osm.pbf -O
+
+      - name: Export to GeoJSON
+        run: osmium export filtered.osm.pbf -a id,type -o filtered.geojson -O --geometry-types point
+
+      - run: npx tsx scripts/match-osm.ts filtered.geojson
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

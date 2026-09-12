@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "sync": "tsx scripts/sync.ts",
+    "match:companies-house": "tsx scripts/match-companies-house.ts",
+    "match:wikidata": "tsx scripts/match-wikidata.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

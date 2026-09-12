@@ -1,0 +1,33 @@
+name: Match Companies House
+
+# Runs scripts/match-companies-house.ts on a schedule to keep "Trading since [date]" facts
+# current — see that script and prisma/schema.prisma's CompanyMatch model for why it
+# re-downloads Companies House's free monthly snapshot fresh each run rather than caching
+# it. Requires a DATABASE_URL secret pointed at the same Postgres database the app uses
+# (see README "Deploying") — same secret the FSA sync (sync.yml) already uses.
+on:
+  schedule:
+    # 03:00 UTC on the 2nd of the month — Companies House's free snapshot itself only
+    # updates monthly, and this runs a day after it's typically refreshed.
+    - cron: "0 3 2 * *"
+  workflow_dispatch: {}
+
+jobs:
+  match:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - run: npm run match:companies-house
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
