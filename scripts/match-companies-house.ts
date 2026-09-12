@@ -25,6 +25,7 @@ import { parse } from "csv-parse";
 import { token_set_ratio } from "fuzzball";
 import { PrismaPg } from "@prisma/adapter-pg";
 import unzipper from "unzipper";
+import { normalizeBusinessName } from "../src/lib/business-name";
 import { Prisma, PrismaClient } from "../src/generated/prisma/client";
 
 const INDEX_URL = "https://download.companieshouse.gov.uk/en_output.html";
@@ -56,34 +57,6 @@ const prisma = new PrismaClient({ adapter });
 // ---------------------------------------------------------------------------
 // Normalisation — see the brief's "Matching strategy" for the exact rules.
 // ---------------------------------------------------------------------------
-
-const CORPORATE_SUFFIXES = ["LIMITED", "LTD", "PLC", "LLP"];
-
-/**
- * Uppercase, strip punctuation, strip a trailing corporate suffix (LIMITED/LTD/PLC/LLP),
- * strip a leading "THE", and — critically for matching a registered legal name against an
- * FSA trading name — take only the part after a "T/A" / "TRADING AS" marker, since that's
- * the name the public (and the FSA) actually knows the business by.
- */
-function normalizeName(raw: string): string {
-  let name = raw.toUpperCase();
-
-  const tradingAsMatch = name.match(/\bT\/A\b\s*(.+)$/) ?? name.match(/\bTRADING AS\b\s*(.+)$/);
-  if (tradingAsMatch) name = tradingAsMatch[1];
-
-  name = name.replace(/[^A-Z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
-
-  for (const suffix of CORPORATE_SUFFIXES) {
-    if (name.endsWith(` ${suffix}`)) {
-      name = name.slice(0, -(suffix.length + 1)).trim();
-      break;
-    }
-  }
-
-  if (name.startsWith("THE ")) name = name.slice(4);
-
-  return name.trim();
-}
 
 // The outward code (e.g. "SW1A" from "SW1A 1AA") — a reasonable proxy for "postcode
 // district" given what's actually on both sides of the match (FSA gives us a full
@@ -176,7 +149,7 @@ async function buildMatchIndex(zipPath: string): Promise<MatchIndex> {
     const companyNumber = record.CompanyNumber?.trim();
     if (!companyName || !companyNumber) continue;
 
-    const normalizedName = normalizeName(companyName);
+    const normalizedName = normalizeBusinessName(companyName);
     const postcode = nullableString(record["RegAddress.PostCode"]);
     if (!normalizedName) continue;
 
@@ -382,7 +355,7 @@ async function main() {
     const lightMatches = new Map<number, LightMatch>();
     let matchedProcessed = 0;
     for (const establishment of establishments) {
-      const normalizedName = normalizeName(establishment.businessName);
+      const normalizedName = normalizeBusinessName(establishment.businessName);
       const match = matchEstablishment(normalizedName, establishment.postcode, index);
       if (match) lightMatches.set(establishment.fhrsId, match);
 

@@ -159,6 +159,28 @@ async function getCompanyInfo(fhrsId: number): Promise<CompanyInfo | null> {
   return { ...match, incorporationDate: toIsoOrNull(match.incorporationDate) };
 }
 
+export interface ChainInfo {
+  wikidataId: string;
+  chainName: string;
+  foundedDate: string | null;
+  headquarters: string | null;
+  website: string | null;
+}
+
+/**
+ * The Wikidata chain match for this establishment, if any — see
+ * scripts/match-wikidata.ts. Matching there is exact-name-or-alias only (no confidence
+ * tiers the way Companies House has), so every row that exists is safe to show directly.
+ */
+async function getChainInfo(fhrsId: number): Promise<ChainInfo | null> {
+  const match = await prisma.chainMatch.findUnique({
+    where: { fhrsId },
+    select: { wikidataId: true, chainName: true, foundedDate: true, headquarters: true, website: true },
+  });
+  if (!match) return null;
+  return { ...match, foundedDate: toIsoOrNull(match.foundedDate) };
+}
+
 export interface EstablishmentDetailData {
   establishment: Establishment;
   /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
@@ -173,6 +195,8 @@ export interface EstablishmentDetailData {
   trajectory: RatingTrajectory;
   /** Companies House match, if any — see getCompanyInfo. */
   company: CompanyInfo | null;
+  /** Wikidata chain match, if any — see getChainInfo. */
+  chain: ChainInfo | null;
 }
 
 /**
@@ -193,7 +217,7 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
   const { latitude, longitude } = establishment;
   const hasCoords = latitude !== null && longitude !== null;
 
-  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company] =
+  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company, chain] =
     await Promise.all([
       isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
       isNumericFhrs && hasCoords
@@ -203,6 +227,7 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
       getRatingHistory(establishment.fhrsId),
       hasCoords ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude) : Promise.resolve([]),
       getCompanyInfo(establishment.fhrsId),
+      getChainInfo(establishment.fhrsId),
     ]);
 
   return {
@@ -220,5 +245,6 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
     nearby,
     trajectory: computeRatingTrajectory(toIsoOrNull(establishment.ratingDate), ratingHistory),
     company,
+    chain,
   };
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
-import type { CompanyInfo, EstablishmentDetailData } from "@/lib/establishment-detail";
+import type { ChainInfo, CompanyInfo, EstablishmentDetailData } from "@/lib/establishment-detail";
 import { formatAddress, formatDate, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { getRatingBand, getRatingMeaning } from "@/lib/rating-scale";
@@ -307,6 +307,38 @@ function CompanyInfoNote({ company }: { company: CompanyInfo }) {
   );
 }
 
+// A "part of this chain" fact sourced from Wikidata (see scripts/match-wikidata.ts) — unlike
+// Companies House this is exact-name-or-alias matching only (no fuzzy tier), so every row
+// that exists is trustworthy enough to state plainly. Links to the chain's own website when
+// Wikidata has one, and always attributes Wikidata as the source even though CC0 doesn't
+// require it (per the brief: "no attribution obligation, but attribute anyway").
+function ChainInfoNote({ chain }: { chain: ChainInfo }) {
+  const founded = formatDate(chain.foundedDate);
+
+  return (
+    <p className="mt-6 border-t border-gray-100 pt-4 text-xs text-gray-500">
+      Part of the{" "}
+      {chain.website ? (
+        <a href={chain.website} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+          {chain.chainName}
+        </a>
+      ) : (
+        chain.chainName
+      )}{" "}
+      chain{founded ? `, founded ${founded}` : ""}, per{" "}
+      <a
+        href={`https://www.wikidata.org/wiki/${chain.wikidataId}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-indigo-600 hover:underline"
+      >
+        Wikidata
+      </a>
+      .
+    </p>
+  );
+}
+
 // Other active establishments within a mile, nearest first — server-rendered from our own
 // database (see getEstablishmentDetailData) rather than the client-fetched widget this
 // replaced, since this data isn't FSA-live-API-dependent and benefits from the same
@@ -370,6 +402,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
     otherLocations,
     trajectory,
     company,
+    chain,
   } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
 
@@ -437,6 +470,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
         </dl>
 
         {company && <CompanyInfoNote company={company} />}
+        {chain && <ChainInfoNote chain={chain} />}
       </div>
 
       <RatingHistorySection history={ratingHistory} trajectory={trajectory} />

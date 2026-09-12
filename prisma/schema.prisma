@@ -113,3 +113,31 @@ model CompanyMatch {
 
   @@index([matchConfidence])
 }
+
+// One row per FSA establishment matched to a UK restaurant/café/pub/supermarket/bakery
+// chain on Wikidata — written by scripts/match-wikidata.ts. Only ~231 UK chains exist in
+// the classes queried, so unlike CompanyMatch there's no storage-size reason not to persist
+// the small source list too, but it's re-fetched fresh each run rather than cached in the
+// DB anyway, since a single SPARQL query is cheap and this keeps the script simple.
+//
+// Matching is exact-name-or-alias only (see the brief's "Costa Coffee Ltd is Costa, but The
+// Costa Del Sol Fish Bar is not" caution) — deliberately conservative, so every row here is
+// trustworthy enough to publish directly (no LOW/unpublishable tier the way Companies House
+// has one, since fuzzy matching was never attempted).
+model ChainMatch {
+  id Int @id @default(autoincrement())
+
+  fhrsId Int @unique
+
+  wikidataId    String
+  chainName     String
+  foundedDate   DateTime?
+  headquarters  String?
+  website       String?
+
+  source      String
+  licence     String
+  retrievedAt DateTime
+
+  matchedAt DateTime @default(now())
+}
