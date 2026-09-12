@@ -31,3 +31,27 @@ export function getRatingMeaning(schemeType: string, ratingValue: string): strin
   const scale = schemeType === "FHRS" ? FHRS_SCALE : FHIS_SCALE;
   return scale.find((entry) => entry.score === ratingValue)?.meaning ?? null;
 }
+
+export type RatingBand = "green" | "amber" | "red" | "gray";
+
+const NUMERIC_FHRS_VALUES = new Set(["0", "1", "2", "3", "4", "5"]);
+
+/**
+ * The red/amber/green (or gray, for anything unrated) categorisation used for the badge
+ * colour, the hero card's accent stripe, and the static per-band OG images — a single
+ * source of truth so the same rating always maps to the same colour everywhere.
+ */
+export function getRatingBand(schemeType: string, ratingValue: string): RatingBand {
+  if (schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(ratingValue)) {
+    const numeric = Number(ratingValue);
+    if (numeric <= 1) return "red";
+    if (numeric <= 3) return "amber";
+    return "green";
+  }
+  if (schemeType === "FHIS") {
+    const normalized = ratingValue.toLowerCase();
+    if (normalized === "pass") return "green";
+    if (normalized === "improvement required") return "amber";
+  }
+  return "gray";
+}

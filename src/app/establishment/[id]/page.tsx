@@ -11,6 +11,7 @@ import { getEstablishmentDetailData } from "@/lib/establishment-detail";
 import { formatRatingDate, humanizeStatus, toEstablishmentSummary } from "@/lib/format";
 import { buildBreadcrumbJsonLd, buildEstablishmentJsonLd } from "@/lib/jsonld";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
+import { getRatingBand } from "@/lib/rating-scale";
 import { establishmentPath, parseFhrsIdParam } from "@/lib/slug";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
@@ -54,11 +55,20 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const title = `${establishment.businessName} Hygiene Rating | ${SITE_NAME}`;
   const description = `Check the official FSA food hygiene rating for ${establishment.businessName} in ${establishment.localAuthorityName} — rated ${ratingText}${inspectedText}.`;
 
+  // One of a small fixed set of pre-generated static images (see public/og/), keyed by
+  // rating band, rather than a per-establishment dynamically-rendered one — the previous
+  // per-page route had no caching and was a major contributor to hitting Vercel's Function
+  // Invocation and Fast Origin Transfer limits across 611k+ establishment pages. This loses
+  // the business name from the image itself, but the page title/description (which still
+  // carry it) are what most platforms show alongside the image anyway.
+  const band = getRatingBand(establishment.schemeType, establishment.ratingValue);
+  const ogImageUrl = `${SITE_URL}/og/${band}.png`;
+
   return {
     title,
     description,
     alternates: { canonical: canonicalUrl },
-    openGraph: { title, description, url: canonicalUrl },
+    openGraph: { title, description, url: canonicalUrl, images: [{ url: ogImageUrl, width: 1200, height: 630 }] },
   };
 }
 

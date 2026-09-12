@@ -3,7 +3,7 @@ import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
 import type { EstablishmentDetailData } from "@/lib/establishment-detail";
 import { formatAddress, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
-import { getRatingMeaning } from "@/lib/rating-scale";
+import { getRatingBand, getRatingMeaning } from "@/lib/rating-scale";
 import type { RatingTrajectory } from "@/lib/rating-trajectory";
 import { establishmentPath } from "@/lib/slug";
 import type { Establishment, NearbyEstablishmentSummary, OtherLocation, RatingHistoryEntry } from "@/lib/types";
@@ -14,19 +14,15 @@ const NUMERIC_FHRS_VALUES = new Set(["0", "1", "2", "3", "4", "5"]);
 // A left-edge accent stripe on the hero card, echoing the same red/amber/green
 // categorisation as RatingBadge — a quick at-a-glance cue before you've even read the
 // badge text.
+const ACCENT_CLASSES = {
+  green: "border-l-green-400",
+  amber: "border-l-amber-400",
+  red: "border-l-red-400",
+  gray: "border-l-gray-300",
+} as const;
+
 function ratingAccentClasses(schemeType: string, ratingValue: string): string {
-  if (schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(ratingValue)) {
-    const numeric = Number(ratingValue);
-    if (numeric <= 1) return "border-l-red-400";
-    if (numeric <= 3) return "border-l-amber-400";
-    return "border-l-green-400";
-  }
-  if (schemeType === "FHIS") {
-    const normalized = ratingValue.toLowerCase();
-    if (normalized === "pass") return "border-l-green-400";
-    if (normalized === "improvement required") return "border-l-amber-400";
-  }
-  return "border-l-gray-300";
+  return ACCENT_CLASSES[getRatingBand(schemeType, ratingValue)];
 }
 
 export function BackLink() {
