@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getBusinessCategoryByTypeId } from "@/lib/business-categories";
+import { getBusinessCategoryByTypeId, getCategoryImagePath } from "@/lib/business-categories";
 import type { ChainInfo, CompanyInfo, EstablishmentDetailData, OsmInfo } from "@/lib/establishment-detail";
 import { formatAddress, formatDate, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
@@ -485,66 +485,76 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
       <Breadcrumbs establishment={establishment} />
 
       <div
-        className={`mt-4 rounded-xl border border-l-4 border-gray-200 bg-white p-6 shadow-sm ${ratingAccentClasses(establishment.schemeType, establishment.ratingValue)}`}
+        className={`mt-4 overflow-hidden rounded-xl border border-l-4 border-gray-200 bg-white shadow-sm ${ratingAccentClasses(establishment.schemeType, establishment.ratingValue)}`}
       >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-gray-900">{establishment.businessName}</h1>
-            <Link
-              href={`/?businessTypeId=${establishment.businessTypeId}`}
-              className="mt-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200"
-            >
-              {establishment.businessType}
-            </Link>
-          </div>
-          <div className="text-left sm:text-right">
-            <Link href="/about" title="What does this rating mean?">
-              <RatingBadge
-                schemeType={establishment.schemeType}
-                ratingValue={establishment.ratingValue}
-                ratingDate={establishment.ratingDate}
-                size="lg"
-              />
-            </Link>
-            {isNumericFhrs && localAuthorityAverageRating !== null && (
-              <AverageRatingNote
-                ratingValue={Number(establishment.ratingValue)}
-                average={localAuthorityAverageRating}
-                localAuthorityName={establishment.localAuthorityName}
-              />
-            )}
-            {isNumericFhrs && nearbyBusinessTypeAverageRating !== null && (
-              <NearbyTypeAverageNote
-                ratingValue={Number(establishment.ratingValue)}
-                average={nearbyBusinessTypeAverageRating}
-                businessType={establishment.businessType}
-              />
-            )}
-          </div>
-        </div>
+        <img
+          src={getCategoryImagePath(establishment.businessTypeId)}
+          alt=""
+          className="h-48 w-full object-cover sm:h-64"
+          width={1200}
+          height={800}
+        />
 
-        <RatingMeaningNote schemeType={establishment.schemeType} ratingValue={establishment.ratingValue} />
-        {trajectory.staleInspection && trajectory.daysSinceLastInspection !== null && (
-          <StaleInspectionNote daysSinceLastInspection={trajectory.daysSinceLastInspection} />
-        )}
-
-        <dl className="mt-6 grid grid-cols-1 gap-4 border-t border-gray-100 pt-6 sm:grid-cols-2">
-          <InfoRow label="Address" value={formatAddress(establishment)} />
-          <div>
-            <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Local authority</dt>
-            <dd className="mt-1 text-sm">
+        <div className="p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900">{establishment.businessName}</h1>
               <Link
-                href={`/?localAuthorityName=${encodeURIComponent(establishment.localAuthorityName)}`}
-                className="text-indigo-600 hover:underline"
+                href={`/?businessTypeId=${establishment.businessTypeId}`}
+                className="mt-2 inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-200"
               >
-                {establishment.localAuthorityName}
+                {establishment.businessType}
               </Link>
-            </dd>
+            </div>
+            <div className="text-left sm:text-right">
+              <Link href="/about" title="What does this rating mean?">
+                <RatingBadge
+                  schemeType={establishment.schemeType}
+                  ratingValue={establishment.ratingValue}
+                  ratingDate={establishment.ratingDate}
+                  size="lg"
+                />
+              </Link>
+              {isNumericFhrs && localAuthorityAverageRating !== null && (
+                <AverageRatingNote
+                  ratingValue={Number(establishment.ratingValue)}
+                  average={localAuthorityAverageRating}
+                  localAuthorityName={establishment.localAuthorityName}
+                />
+              )}
+              {isNumericFhrs && nearbyBusinessTypeAverageRating !== null && (
+                <NearbyTypeAverageNote
+                  ratingValue={Number(establishment.ratingValue)}
+                  average={nearbyBusinessTypeAverageRating}
+                  businessType={establishment.businessType}
+                />
+              )}
+            </div>
           </div>
-        </dl>
 
-        {company && <CompanyInfoNote company={company} />}
-        {chain && <ChainInfoNote chain={chain} />}
+          <RatingMeaningNote schemeType={establishment.schemeType} ratingValue={establishment.ratingValue} />
+          {trajectory.staleInspection && trajectory.daysSinceLastInspection !== null && (
+            <StaleInspectionNote daysSinceLastInspection={trajectory.daysSinceLastInspection} />
+          )}
+
+          <dl className="mt-6 grid grid-cols-1 gap-4 border-t border-gray-100 pt-6 sm:grid-cols-2">
+            <InfoRow label="Address" value={formatAddress(establishment)} />
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-gray-400">Local authority</dt>
+              <dd className="mt-1 text-sm">
+                <Link
+                  href={`/?localAuthorityName=${encodeURIComponent(establishment.localAuthorityName)}`}
+                  className="text-indigo-600 hover:underline"
+                >
+                  {establishment.localAuthorityName}
+                </Link>
+              </dd>
+            </div>
+          </dl>
+
+          {company && <CompanyInfoNote company={company} />}
+          {chain && <ChainInfoNote chain={chain} />}
+        </div>
       </div>
 
       <RatingHistorySection history={ratingHistory} trajectory={trajectory} />

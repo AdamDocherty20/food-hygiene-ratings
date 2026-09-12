@@ -13,6 +13,7 @@ import {
 import { EstablishmentMap, type MapPoint, type SearchThisAreaQuery } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
 import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
+import { getCategoryImagePath } from "@/lib/business-categories";
 import { formatAddress } from "@/lib/format";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
@@ -611,9 +612,17 @@ export function SearchPageContent() {
                   <li key={result.id}>
                     <Link
                       href={establishmentPath(result.fhrsId, result.businessName)}
-                      className="block rounded-xl border border-gray-200 bg-white p-4 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+                      className="flex gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
                     >
-                      <div className="flex items-start justify-between gap-4">
+                      <img
+                        src={getCategoryImagePath(result.businessTypeId)}
+                        alt=""
+                        className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                        loading="lazy"
+                        width={80}
+                        height={80}
+                      />
+                      <div className="flex flex-1 items-start justify-between gap-4">
                         <div>
                           <p className="font-semibold text-gray-900">{result.businessName}</p>
                           <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
