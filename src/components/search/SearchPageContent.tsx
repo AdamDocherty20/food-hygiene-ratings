@@ -408,7 +408,13 @@ export function SearchPageContent() {
       <div className="mx-auto max-w-5xl px-4 pb-8">
         <form
           onSubmit={handleSubmit}
-          className="-mt-10 mb-8 grid grid-cols-1 gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-lg shadow-gray-900/5 sm:-mt-12 sm:grid-cols-4 sm:p-5"
+          // relative: the hero section above is `position: relative` (needed for its
+          // background photo) — per CSS stacking rules that makes it paint *above* this
+          // plain in-flow sibling in their overlapping region regardless of DOM order,
+          // which was burying the form's labels under the hero. Making the form itself
+          // relative (any z-index, even auto) puts both in the same "positioned" paint
+          // step, so DOM order — form after hero — wins and the form shows on top again.
+          className="relative -mt-10 mb-8 grid grid-cols-1 gap-4 rounded-xl border border-gray-100 bg-white p-4 shadow-lg shadow-gray-900/5 sm:-mt-12 sm:grid-cols-4 sm:p-5"
         >
           <div className="flex flex-col gap-1">
             <label htmlFor="name" className="text-sm font-medium text-gray-700">
