@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeaderSearch, HeaderSearchButton } from "@/components/HeaderSearch";
 
 // The same 20x20 star used in RatingBadge's star rows — reused here so the logo reads as
 // "the rating star, found via search", tying the mark directly to what the site does.
@@ -25,12 +26,19 @@ function BrandMark() {
 export function Header() {
   return (
     <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-        <Link href="/" className="flex items-center gap-2 text-lg font-bold tracking-tight text-gray-900">
+      <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
+        <Link
+          href="/"
+          className="flex shrink-0 items-center gap-2 text-lg font-bold tracking-tight text-gray-900"
+        >
           <BrandMark />
-          <span>Should I Eat Here</span>
+          <span className="hidden sm:inline">Should I Eat Here</span>
         </Link>
-        <div className="flex items-center gap-4">
+        <div className="flex-1">
+          <HeaderSearch />
+        </div>
+        <div className="flex shrink-0 items-center gap-4">
+          <HeaderSearchButton />
           <Link
             href="/saved"
             className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-indigo-600"
@@ -38,13 +46,13 @@ export function Header() {
             <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-4-7 4V5z" />
             </svg>
-            Saved
+            <span className="hidden sm:inline">Saved</span>
           </Link>
           <a
             href="https://ratings.food.gov.uk"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden text-sm font-medium text-gray-500 transition-colors hover:text-indigo-600 sm:inline-flex sm:items-center sm:gap-1"
+            className="hidden text-sm font-medium text-gray-500 transition-colors hover:text-indigo-600 lg:inline-flex lg:items-center lg:gap-1"
           >
             Official FSA site
             <span aria-hidden>↗</span>

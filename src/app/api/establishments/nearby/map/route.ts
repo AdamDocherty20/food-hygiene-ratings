@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { jsonError } from "@/lib/api-response";
+import { cuisineFilterSql } from "@/lib/cuisine-filter-sql";
+import { getCuisineBySlug } from "@/lib/cuisines";
 import { boundingBoxDelta, distanceMilesSql, parseRequiredCoordinate, parseRadiusMiles } from "@/lib/geo";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -49,6 +51,12 @@ export async function GET(request: NextRequest) {
   if (!radiusResult.ok) return jsonError(400, radiusResult.error);
   const radiusMiles = radiusResult.value;
 
+  const cuisineSlug = searchParams.get("cuisine")?.trim();
+  const cuisine = cuisineSlug ? getCuisineBySlug(cuisineSlug) : null;
+  if (cuisineSlug && !cuisine) {
+    return jsonError(400, `Invalid "cuisine" value: "${cuisineSlug}".`);
+  }
+
   const { latDelta, lngDelta } = boundingBoxDelta(lat, radiusMiles);
   const distanceExpr = distanceMilesSql(lat, lng);
 
@@ -60,6 +68,7 @@ export async function GET(request: NextRequest) {
       AND "longitude" IS NOT NULL
       AND "latitude" BETWEEN ${lat - latDelta} AND ${lat + latDelta}
       AND "longitude" BETWEEN ${lng - lngDelta} AND ${lng + lngDelta}
+      ${cuisine ? Prisma.sql`AND ${cuisineFilterSql(cuisine)}` : Prisma.empty}
   `;
 
   try {

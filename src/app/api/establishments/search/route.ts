@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { jsonError } from "@/lib/api-response";
+import { cuisineFilterSql } from "@/lib/cuisine-filter-sql";
+import { getCuisineBySlug } from "@/lib/cuisines";
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { prisma } from "@/lib/prisma";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -83,6 +85,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Cuisine isn't a real column — it's an EXISTS(...) subquery against OsmMatch (see
+  // cuisineFilterSql) — so it can't be expressed via Prisma's typed query builder used by
+  // the "name" sort branch below. Any cuisine filter forces the raw-SQL path regardless of
+  // sort, same query shape the "rating_desc"/"rating_asc" branch already uses.
+  const cuisineSlug = searchParams.get("cuisine")?.trim();
+  const cuisine = cuisineSlug ? getCuisineBySlug(cuisineSlug) : null;
+  if (cuisineSlug && !cuisine) {
+    return jsonError(400, `Invalid "cuisine" value: "${cuisineSlug}".`);
+  }
+
   const where: Prisma.EstablishmentWhereInput = {
     isActive: true,
     ...(name ? { businessName: { contains: name, mode: "insensitive" } } : {}),
@@ -93,7 +105,7 @@ export async function GET(request: NextRequest) {
   };
 
   try {
-    if (sort === "name") {
+    if (sort === "name" && !cuisine) {
       const [total, results] = await Promise.all([
         prisma.establishment.count({ where }),
         prisma.establishment.findMany({
@@ -110,20 +122,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Rating sort needs a raw query: ratingValue is a free-text string, so there's no
-    // column Prisma's typed orderBy can sort meaningfully by "best first" — see
-    // ratingRankSql's own comment for what it does.
-    const rankExpr = ratingRankSql();
-
+    // Rating sort (and any cuisine-filtered search, regardless of sort) needs a raw query:
+    // ratingValue is a free-text string with no column Prisma's typed orderBy can sort
+    // meaningfully by "best first" (see ratingRankSql), and cuisine is an EXISTS(...)
+    // subquery Prisma's builder can't express at all.
     const conditions = [Prisma.sql`"isActive" = true`];
     if (name) conditions.push(Prisma.sql`"businessName" ILIKE ${`%${name}%`}`);
     if (postcode) conditions.push(Prisma.sql`"postcode" ILIKE ${`%${postcode}%`}`);
     if (localAuthorityName) conditions.push(Prisma.sql`"localAuthorityName" ILIKE ${`%${localAuthorityName}%`}`);
     if (ratingValue) conditions.push(Prisma.sql`"ratingValue" = ${ratingValue}`);
     if (businessTypeId !== undefined) conditions.push(Prisma.sql`"businessTypeId" = ${businessTypeId}`);
+    if (cuisine) conditions.push(cuisineFilterSql(cuisine));
     const whereClause = Prisma.join(conditions, " AND ");
 
-    const direction = sort === "rating_desc" ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+    const orderBy =
+      sort === "name"
+        ? Prisma.sql`"businessName" ASC`
+        : Prisma.sql`${ratingRankSql()} ${sort === "rating_desc" ? Prisma.sql`DESC` : Prisma.sql`ASC`} NULLS LAST, "businessName" ASC`;
 
     const [countResult, results] = await Promise.all([
       prisma.$queryRaw<{ total: bigint }[]>`
@@ -132,7 +147,7 @@ export async function GET(request: NextRequest) {
       prisma.$queryRaw<EstablishmentRow[]>`
         SELECT * FROM "Establishment"
         WHERE ${whereClause}
-        ORDER BY ${rankExpr} ${direction} NULLS LAST, "businessName" ASC
+        ORDER BY ${orderBy}
         LIMIT ${take} OFFSET ${skip}
       `,
     ]);

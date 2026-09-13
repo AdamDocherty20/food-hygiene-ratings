@@ -189,6 +189,9 @@ model OsmMatch {
   matchedAt DateTime @default(now())
 
   @@index([matchMethod])
+  @@index([cuisine])
+  @@index([dietVegan])
+  @@index([dietVegetarian])
 }
 
 // One row per FSA establishment we've ever looked up against the Google Places API (New)
