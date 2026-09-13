@@ -211,3 +211,49 @@ model PlacePhotoMatch {
 
   matchedAt DateTime @default(now())
 }
+
+// A business owner/manager's request to claim an establishment listing — submitted via
+// the public claim form (src/app/establishment/[id]/claim), reviewed manually by the site
+// operator via the password-gated /admin/claims page. No self-serve accounts exist yet
+// (deliberately, at this scale of demand — see BusinessProfile below for what happens
+// after approval), so fhrsId is a loose reference like every other match table, not a
+// hard FK — see OsmMatch's own comment for why.
+model BusinessClaim {
+  id Int @id @default(autoincrement())
+
+  fhrsId Int
+
+  claimantName  String
+  claimantEmail String
+  claimantPhone String?
+  relationship  String
+  message       String?
+
+  // "pending" | "approved" | "rejected"
+  status String @default("pending")
+
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([fhrsId])
+  @@index([status])
+}
+
+// The actual owner-provided content shown on an establishment's page — populated by the
+// site operator through /admin/establishment/[id] once a claim is approved and the owner
+// has sent over their copy/photos (see BusinessClaim's comment for why this is manual
+// rather than a self-serve owner-facing editor for now). Rendered content, not a
+// moderation queue: whatever's here goes live immediately, since the claim approval step
+// is the trust boundary, not each individual edit.
+model BusinessProfile {
+  id Int @id @default(autoincrement())
+
+  fhrsId Int @unique
+
+  description String?
+  website     String?
+  phone       String?
+  photoUrls   String[]
+
+  updatedAt DateTime @updatedAt
+}

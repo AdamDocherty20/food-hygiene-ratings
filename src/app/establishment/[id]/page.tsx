@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import { EstablishmentClientExtras } from "./EstablishmentClientExtras";
@@ -138,6 +139,14 @@ export default async function EstablishmentDetailPage({ params }: { params: Prom
           )}
           <SaveButton establishment={toEstablishmentSummary(establishment)} />
           <ShareButton title={establishment.businessName} text={shareText} />
+          {!detail.businessProfile && (
+            <Link
+              href={`${canonicalPath}/claim`}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            >
+              Claim this business
+            </Link>
+          )}
         </div>
       </div>
 

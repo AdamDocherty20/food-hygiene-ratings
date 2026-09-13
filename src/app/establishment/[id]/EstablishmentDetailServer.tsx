@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { getBusinessCategoryByTypeId, getCategoryImagePath } from "@/lib/business-categories";
-import type { ChainInfo, CompanyInfo, EstablishmentDetailData, OsmInfo } from "@/lib/establishment-detail";
+import type {
+  BusinessProfileInfo,
+  ChainInfo,
+  CompanyInfo,
+  EstablishmentDetailData,
+  OsmInfo,
+} from "@/lib/establishment-detail";
 import { formatAddress, formatDate, formatRatingDate, humanizeStatus } from "@/lib/format";
 import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { getRatingBand, getRatingMeaning } from "@/lib/rating-scale";
@@ -360,6 +366,56 @@ function OsmInfoSection({ osm }: { osm: OsmInfo }) {
 // confusing, possibly wrong claim about a real business — the incorporation date alone is a
 // safe, low-risk fact even when the match is imperfect. Links through to the real Companies
 // House filing so the claim is independently checkable.
+// Owner-provided content (see BusinessProfile in schema.prisma) — description, website,
+// phone, and any photos beyond the first (which already became the hero image above, see
+// heroImageUrl). Shown as a distinct highlighted box, not a thin footnote like
+// CompanyInfoNote/ChainInfoNote below, since this is first-party content from the actual
+// business rather than a third-party data match.
+function BusinessProfileSection({ profile }: { profile: BusinessProfileInfo }) {
+  const galleryPhotos = profile.photoUrls.slice(1);
+  const hasContactInfo = profile.website || profile.phone;
+
+  if (!profile.description && !hasContactInfo && galleryPhotos.length === 0) return null;
+
+  return (
+    <div className="mt-6 rounded-lg border border-indigo-100 bg-indigo-50/50 p-4">
+      <p className="text-xs font-semibold tracking-wide text-indigo-700 uppercase">From the owner</p>
+      {profile.description && <p className="mt-2 text-sm text-gray-700">{profile.description}</p>}
+      {hasContactInfo && (
+        <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          {profile.website && (
+            <div>
+              <dt className="sr-only">Website</dt>
+              <dd>
+                <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                  {profile.website.replace(/^https?:\/\//, "")}
+                </a>
+              </dd>
+            </div>
+          )}
+          {profile.phone && (
+            <div>
+              <dt className="sr-only">Phone</dt>
+              <dd>
+                <a href={`tel:${profile.phone}`} className="text-indigo-600 hover:underline">
+                  {profile.phone}
+                </a>
+              </dd>
+            </div>
+          )}
+        </dl>
+      )}
+      {galleryPhotos.length > 0 && (
+        <div className="mt-3 flex gap-2 overflow-x-auto">
+          {galleryPhotos.map((url) => (
+            <img key={url} src={url} alt="" className="h-20 w-20 shrink-0 rounded-md object-cover" loading="lazy" width={160} height={160} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompanyInfoNote({ company }: { company: CompanyInfo }) {
   const incorporated = formatDate(company.incorporationDate);
   if (!incorporated) return null;
@@ -478,8 +534,13 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
     chain,
     osm,
     photo,
+    businessProfile,
   } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
+  // A real photo of the actual business, from the owner, beats a Google Places match,
+  // which beats generic category art — see BusinessProfile's comment in schema.prisma.
+  const ownerPhoto = businessProfile?.photoUrls[0];
+  const heroImageUrl = ownerPhoto ?? photo?.url ?? getCategoryImagePath(establishment.businessTypeId);
 
   return (
     <>
@@ -489,16 +550,12 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
         className={`mt-4 overflow-hidden rounded-xl border border-l-4 border-gray-200 bg-white shadow-sm ${ratingAccentClasses(establishment.schemeType, establishment.ratingValue)}`}
       >
         <div className="relative">
-          <img
-            src={photo?.url ?? getCategoryImagePath(establishment.businessTypeId)}
-            alt=""
-            className="h-48 w-full object-cover sm:h-64"
-            width={1200}
-            height={800}
-          />
-          {/* Google's Places API terms require attribution wherever a photo is shown —
-              not just a courtesy credit like the category placeholder art needs none of. */}
-          {photo?.attribution && (
+          <img src={heroImageUrl} alt="" className="h-48 w-full object-cover sm:h-64" width={1200} height={800} />
+          {/* Google's Places API terms require attribution wherever a photo is shown — not
+              just a courtesy credit like the owner/category art needs none of. Only shown
+              when the Google photo is actually the one in use (an owner photo takes
+              priority above, so this only applies when there's no owner photo). */}
+          {!ownerPhoto && photo?.attribution && (
             <p className="absolute right-2 bottom-2 rounded bg-black/50 px-1.5 py-0.5 text-[11px] text-white">
               Photo: {photo.attribution}
             </p>
@@ -562,6 +619,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
             </div>
           </dl>
 
+          {businessProfile && <BusinessProfileSection profile={businessProfile} />}
           {company && <CompanyInfoNote company={company} />}
           {chain && <ChainInfoNote chain={chain} />}
         </div>

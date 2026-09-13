@@ -411,6 +411,7 @@ export function SearchPageContent() {
 
       <div className="mx-auto max-w-5xl px-4 pb-8">
         <form
+          id="search"
           onSubmit={handleSubmit}
           // relative: the hero section above is `position: relative` (needed for its
           // background photo) — per CSS stacking rules that makes it paint *above* this
@@ -803,6 +804,30 @@ function HomepageDiscovery() {
               {area.name}
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm sm:grid sm:grid-cols-2">
+        <img
+          src="/categories/restaurants-cafes.jpg"
+          alt=""
+          className="h-40 w-full object-cover sm:h-full"
+          loading="lazy"
+          width={600}
+          height={400}
+        />
+        <div className="flex flex-col justify-center p-6">
+          <h2 className="text-lg font-semibold text-gray-900">Are you a business owner?</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            Claim your listing to add photos and details for your business — find it below, then look for
+            &ldquo;Claim this business&rdquo; on its page.
+          </p>
+          <a
+            href="#search"
+            className="mt-4 inline-flex w-fit items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          >
+            Find your business
+          </a>
         </div>
       </section>
     </div>

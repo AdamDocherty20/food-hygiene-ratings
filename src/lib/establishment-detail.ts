@@ -224,6 +224,28 @@ async function getOsmInfo(fhrsId: number): Promise<OsmInfo | null> {
   return match;
 }
 
+export interface BusinessProfileInfo {
+  description: string | null;
+  website: string | null;
+  phone: string | null;
+  photoUrls: string[];
+}
+
+/**
+ * Owner-provided content for this establishment, if a claim has ever been approved and
+ * the site operator has entered anything via /admin/establishment/[id] — see
+ * BusinessProfile's comment in schema.prisma. Not gated on claim status here: an operator
+ * could in principle add a profile without a formal claim (e.g. contacted directly), so
+ * this just reflects whatever content currently exists.
+ */
+async function getBusinessProfile(fhrsId: number): Promise<BusinessProfileInfo | null> {
+  const profile = await prisma.businessProfile.findUnique({
+    where: { fhrsId },
+    select: { description: true, website: true, phone: true, photoUrls: true },
+  });
+  return profile;
+}
+
 export interface EstablishmentDetailData {
   establishment: Establishment;
   /** Average FHRS rating for the same local authority, or null for FHIS/no comparable data. */
@@ -244,6 +266,10 @@ export interface EstablishmentDetailData {
   osm: OsmInfo | null;
   /** A real photo of this establishment via Google Places, if available — see getEstablishmentPhoto. */
   photo: EstablishmentPhoto | null;
+  /** Owner-provided content, if any — see getBusinessProfile. Takes priority over `photo`
+   * and the category placeholder for the hero image (real photos of the actual business
+   * beat a third-party match or generic category art). */
+  businessProfile: BusinessProfileInfo | null;
 }
 
 /**
@@ -264,20 +290,31 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
   const { latitude, longitude } = establishment;
   const hasCoords = latitude !== null && longitude !== null;
 
-  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company, chain, osm, photo] =
-    await Promise.all([
-      isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
-      isNumericFhrs && hasCoords
-        ? getNearbyBusinessTypeAverageRating(establishment.businessTypeId, latitude, longitude)
-        : Promise.resolve(null),
-      getOtherLocations(establishment.businessName, establishment.fhrsId),
-      getRatingHistory(establishment.fhrsId),
-      hasCoords ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude) : Promise.resolve([]),
-      getCompanyInfo(establishment.fhrsId),
-      getChainInfo(establishment.fhrsId),
-      getOsmInfo(establishment.fhrsId),
-      getEstablishmentPhoto(establishment),
-    ]);
+  const [
+    localAuthorityAverageRating,
+    nearbyBusinessTypeAverageRating,
+    otherLocations,
+    ratingHistory,
+    nearby,
+    company,
+    chain,
+    osm,
+    photo,
+    businessProfile,
+  ] = await Promise.all([
+    isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
+    isNumericFhrs && hasCoords
+      ? getNearbyBusinessTypeAverageRating(establishment.businessTypeId, latitude, longitude)
+      : Promise.resolve(null),
+    getOtherLocations(establishment.businessName, establishment.fhrsId),
+    getRatingHistory(establishment.fhrsId),
+    hasCoords ? getNearbyEstablishments(establishment.fhrsId, latitude, longitude) : Promise.resolve([]),
+    getCompanyInfo(establishment.fhrsId),
+    getChainInfo(establishment.fhrsId),
+    getOsmInfo(establishment.fhrsId),
+    getEstablishmentPhoto(establishment),
+    getBusinessProfile(establishment.fhrsId),
+  ]);
 
   return {
     establishment: {
@@ -297,5 +334,6 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
     chain,
     osm,
     photo,
+    businessProfile,
   };
 }
