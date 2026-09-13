@@ -35,6 +35,10 @@ export default async function AdminClaimsPage() {
         </form>
       </div>
 
+      <Link href="/admin/blog" className="mt-2 inline-block text-sm font-medium text-indigo-600 hover:underline">
+        Blog posts →
+      </Link>
+
       <h2 className="mt-8 text-sm font-semibold tracking-wide text-gray-500 uppercase">Pending ({pending.length})</h2>
       <ul className="mt-3 flex flex-col gap-3">
         {pending.length === 0 && <p className="text-sm text-gray-500">Nothing waiting on review.</p>}

@@ -156,3 +156,30 @@ export function buildFaqJsonLd(items: { question: string; answer: string }[]) {
     })),
   };
 }
+
+/** BlogPosting structured data for a /blog/[slug] page — eligible for article rich results. */
+export function buildBlogPostingJsonLd(post: {
+  slug: string;
+  title: string;
+  excerpt: string;
+  coverImageUrl: string | null;
+  publishedAt: Date | string | null;
+  updatedAt: Date | string;
+}) {
+  const publishedAt = post.publishedAt instanceof Date ? post.publishedAt.toISOString() : post.publishedAt;
+  const updatedAt = post.updatedAt instanceof Date ? post.updatedAt.toISOString() : post.updatedAt;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt,
+    image: post.coverImageUrl ?? undefined,
+    datePublished: publishedAt ?? undefined,
+    dateModified: updatedAt,
+    url: `${SITE_URL}/blog/${post.slug}`,
+    author: { "@type": "Organization", name: "Should I Eat Here" },
+    publisher: { "@type": "Organization", name: "Should I Eat Here" },
+    mainEntityOfPage: { "@type": "WebPage", "@id": `${SITE_URL}/blog/${post.slug}` },
+  };
+}

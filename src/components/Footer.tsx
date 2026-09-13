@@ -77,6 +77,7 @@ export function Footer() {
               links={[
                 { href: "/area", label: "Browse by Area" },
                 { href: "/guide", label: "Guide" },
+                { href: "/blog", label: "Blog" },
                 { href: "/about", label: "About & FAQ" },
               ]}
             />

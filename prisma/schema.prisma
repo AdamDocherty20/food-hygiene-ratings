@@ -257,3 +257,34 @@ model BusinessProfile {
 
   updatedAt DateTime @updatedAt
 }
+
+// Editorial content for /blog, written and published entirely through the password-gated
+// /admin/blog editor — same single-operator model as BusinessProfile, no author accounts.
+// `content` is Markdown, rendered with react-markdown on the public page rather than
+// stored as HTML, so the editor stays a plain textarea with no rich-text/XSS surface to
+// manage. `slug` is generated from the title once at creation and never changes after
+// (see src/lib/blog.ts) so published post URLs never break under a later title edit.
+model BlogPost {
+  id Int @id @default(autoincrement())
+
+  slug          String  @unique
+  title         String
+  excerpt       String
+  content       String
+  coverImageUrl String?
+
+  // "draft" | "published" — draft posts 404 on the public site and are excluded from the
+  // sitemap, but stay listed (with a "Draft" badge) in /admin/blog so they can be found
+  // and finished later.
+  status String @default("draft")
+
+  // Set the first time a post transitions to "published" and left alone after — toggling
+  // back to draft and republishing keeps the original date rather than bumping it, which
+  // matches how a "just fixed a typo" re-save should behave for a blog.
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, publishedAt])
+}

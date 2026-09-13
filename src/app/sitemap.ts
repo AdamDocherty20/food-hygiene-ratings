@@ -33,6 +33,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const latestSync = await prisma.establishment.aggregate({ _max: { lastSeenAt: true }, where: { isActive: true } });
   const lastModified = latestSync._max.lastSeenAt ?? new Date();
 
+  const publishedPosts = await prisma.blogPost.findMany({
+    where: { status: "published" },
+    select: { slug: true, publishedAt: true, updatedAt: true },
+  });
+  const blogEntries: MetadataRoute.Sitemap = publishedPosts.map((post) => ({
+    url: `${SITE_URL}/blog/${post.slug}`,
+    lastModified: post.updatedAt,
+    changeFrequency: "monthly",
+    priority: 0.5,
+  }));
+
   const areaEntries: MetadataRoute.Sitemap = topAreas.map((authority) => ({
     url: `${SITE_URL}/area/${authority.slug}`,
     lastModified,
@@ -74,7 +85,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.4,
     },
+    {
+      url: `${SITE_URL}/blog`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.4,
+    },
     ...areaEntries,
     ...categoryEntries,
+    ...blogEntries,
   ];
 }
