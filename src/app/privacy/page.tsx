@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const TITLE = "Privacy Policy";
 const DESCRIPTION = "What data Should I Eat Here collects, why, and how to contact us about it.";
-const CONTACT_EMAIL = "adamdocherty100@gmail.com";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -25,12 +24,8 @@ export default function PrivacyPage() {
       <section className="mt-8">
         <h2 className="text-lg font-semibold text-gray-900">Who runs this site</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Should I Eat Here is an independent site run by Adam Docherty. If you have any question about this
-          policy or your data, email{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-indigo-600 underline-offset-2 hover:underline">
-            {CONTACT_EMAIL}
-          </a>
-          .
+          Should I Eat Here is an independent site run by Adam Docherty. A contact address for questions about
+          this policy or your data will be published here shortly.
         </p>
       </section>
 
@@ -126,12 +121,8 @@ export default function PrivacyPage() {
       <section className="mt-8">
         <h2 className="text-lg font-semibold text-gray-900">Your rights</h2>
         <p className="mt-2 text-sm text-gray-600">
-          If you&apos;ve submitted a claim, you can ask us to show you what we hold, correct it, or delete it, by
-          emailing{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-indigo-600 underline-offset-2 hover:underline">
-            {CONTACT_EMAIL}
-          </a>
-          .
+          If you&apos;ve submitted a claim, you can ask us to show you what we hold, correct it, or delete it — a
+          contact address for these requests will be published here shortly.
         </p>
       </section>
 

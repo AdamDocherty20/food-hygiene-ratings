@@ -64,10 +64,6 @@ export function Footer() {
             className="font-medium text-indigo-600 underline-offset-2 hover:underline"
           >
             adamdocherty.com
-          </a>{" "}
-          · Contact:{" "}
-          <a href="mailto:adamdocherty100@gmail.com" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
-            adamdocherty100@gmail.com
           </a>
         </p>
       </div>

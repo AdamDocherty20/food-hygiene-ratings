@@ -4,7 +4,6 @@ import Link from "next/link";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const TITLE = "Terms and Conditions";
 const DESCRIPTION = "The terms for using Should I Eat Here, including where the ratings data comes from and its limitations.";
-const CONTACT_EMAIL = "adamdocherty100@gmail.com";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -113,11 +112,7 @@ export default function TermsPage() {
       <section className="mt-8">
         <h2 className="text-lg font-semibold text-gray-900">Contact</h2>
         <p className="mt-2 text-sm text-gray-600">
-          Questions about these terms:{" "}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="font-medium text-indigo-600 underline-offset-2 hover:underline">
-            {CONTACT_EMAIL}
-          </a>
-          . See also our{" "}
+          A contact address for questions about these terms will be published here shortly. See also our{" "}
           <Link href="/privacy" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
             Privacy Policy
           </Link>
