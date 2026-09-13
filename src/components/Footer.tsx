@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { FooterIllustration } from "@/components/FooterIllustration";
 
 // Reused from Header.tsx's BrandMark, but inverted (white on transparent) for readability
 // against the footer's own indigo/blue background — the header's gradient mark would have
@@ -37,9 +36,8 @@ function LinkColumn({ title, links }: { title: string; links: { href: string; la
 export function Footer() {
   return (
     <footer>
-      <div className="bg-gray-50 pt-10 pb-6 text-center">
-        <FooterIllustration />
-        <h2 className="mt-2 text-lg font-bold tracking-tight text-gray-900">Know before you go.</h2>
+      <div className="bg-gray-50 pt-10 pb-8 text-center">
+        <h2 className="text-lg font-bold tracking-tight text-gray-900">Know before you go.</h2>
         <p className="mx-auto mt-1 max-w-sm px-4 text-sm text-gray-500">
           Official UK food hygiene ratings for every restaurant, takeaway and shop we could find.
         </p>
