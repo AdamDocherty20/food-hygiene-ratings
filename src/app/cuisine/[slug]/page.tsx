@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CuisineNearMe } from "./CuisineNearMe";
+import { buildBreadcrumbJsonLd } from "@/lib/jsonld";
 import { getCuisineBySlug } from "@/lib/cuisines";
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const SITE_NAME = "Should I Eat Here";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -10,9 +12,15 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const cuisine = getCuisineBySlug(slug);
   if (!cuisine) return {};
 
+  const title = `Best ${cuisine.label} Near You | ${SITE_NAME}`;
+  const description = `Find ${cuisine.label.toLowerCase()} restaurants and takeaways near you, with official UK food hygiene ratings for each one.`;
+  const url = `${SITE_URL}/cuisine/${cuisine.slug}`;
+
   return {
-    title: `Best ${cuisine.label} Near You | ${SITE_NAME}`,
-    description: `Find ${cuisine.label.toLowerCase()} restaurants and takeaways near you, with official UK food hygiene ratings for each one.`,
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: { title, description, url },
   };
 }
 
@@ -26,8 +34,14 @@ export default async function CuisinePage({ params }: { params: Promise<{ slug: 
   const cuisine = getCuisineBySlug(slug);
   if (!cuisine) notFound();
 
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: "Home", url: SITE_URL },
+    { name: `Best ${cuisine.label} Near You`, url: `${SITE_URL}/cuisine/${cuisine.slug}` },
+  ]);
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <h1 className="text-2xl font-bold tracking-tight text-gray-900">Best {cuisine.label} Near You</h1>
       <p className="mt-2 text-sm text-gray-600">
         Official UK food hygiene ratings for {cuisine.label.toLowerCase()} places near your current location.
