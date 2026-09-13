@@ -389,7 +389,7 @@ export function SearchPageContent() {
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/10" />
-        <div className="relative mx-auto max-w-5xl px-4 pt-16 pb-28 sm:pt-24 sm:pb-36">
+        <div className="relative mx-auto max-w-5xl px-4 pt-14 pb-20 sm:pt-20 sm:pb-24">
           <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl">
             Find food hygiene ratings near you
           </h1>
