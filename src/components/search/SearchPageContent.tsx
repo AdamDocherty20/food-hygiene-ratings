@@ -13,8 +13,9 @@ import {
 import { EstablishmentMap, type MapPoint, type SearchThisAreaQuery } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
 import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
-import { getCategoryImagePath } from "@/lib/business-categories";
+import { BUSINESS_CATEGORIES, getCategoryImagePath } from "@/lib/business-categories";
 import { formatAddress } from "@/lib/format";
+import { LOCAL_AUTHORITIES } from "@/lib/local-authorities";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
@@ -37,6 +38,11 @@ const SORT_OPTIONS: { value: string; label: string }[] = [
 // since they're a small minority of the dataset and don't fit the same scale; they're
 // still reachable via the ordinary search filters.
 const RATING_CHIPS = ["5", "4", "3", "2", "1", "0"];
+// The "Popular areas" grid shown on the idle homepage — the biggest local authorities by
+// establishment count, since those are the places a visitor is most likely to be
+// searching from. LOCAL_AUTHORITIES is already static (see local-authorities.ts), so this
+// sort/slice only needs to happen once at module load, not on every render.
+const POPULAR_AREAS = [...LOCAL_AUTHORITIES].sort((a, b) => b.count - a.count).slice(0, 24);
 
 // A search result, optionally annotated with distanceMiles when it came from the
 // "near me" (nearby) endpoint rather than the name/postcode/type search endpoint.
@@ -372,16 +378,26 @@ export function SearchPageContent() {
 
   return (
     <div>
-      <section className="bg-gradient-to-br from-indigo-600 to-blue-600 pt-10 pb-16 sm:pt-14 sm:pb-20">
-        <div className="mx-auto max-w-5xl px-4">
-          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+      <section className="relative overflow-hidden">
+        <img
+          src="/hero.jpg"
+          alt=""
+          // The hero photo, unlike the establishment/search-result thumbnails, is the
+          // page's likely LCP element — eager-load it at high priority rather than
+          // treating it like the lazy-loaded category thumbnails elsewhere.
+          fetchPriority="high"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/45 to-black/10" />
+        <div className="relative mx-auto max-w-5xl px-4 pt-16 pb-28 sm:pt-24 sm:pb-36">
+          <h1 className="text-3xl font-bold tracking-tight text-white sm:text-5xl">
             Find food hygiene ratings near you
           </h1>
-          <p className="mt-3 max-w-2xl text-indigo-100">
+          <p className="mt-3 max-w-2xl text-gray-100">
             Search official Food Standards Agency ratings for restaurants, takeaways, cafes, shops and more —
             by name, postcode, or business type.
           </p>
-          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-indigo-100">
+          <div className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm font-medium text-gray-100">
             <HeroStat label="Official FSA data" />
             <HeroStat label="Updated regularly" />
             <HeroStat label="600,000+ UK establishments" />
@@ -514,172 +530,218 @@ export function SearchPageContent() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className={mobileView === "map" ? "hidden lg:block" : ""}>
-            {error && (
-              <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
-                {error}
-              </div>
-            )}
+        {isIdle ? (
+          <HomepageDiscovery />
+        ) : (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className={mobileView === "map" ? "hidden lg:block" : ""}>
+              {error && (
+                <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  {error}
+                </div>
+              )}
 
-            {!isIdle && !isNearbyMode && (
-              <div className="mb-4 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-1.5 text-sm text-gray-600">
-                  Sort by
-                  <select
-                    value={searchParams.get("sort") ?? DEFAULT_SORT}
-                    onChange={(e) => setSort(e.target.value)}
-                    className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
-                  >
-                    {SORT_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              {!isNearbyMode && (
+                <div className="mb-4 flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600">
+                    Sort by
+                    <select
+                      value={searchParams.get("sort") ?? DEFAULT_SORT}
+                      onChange={(e) => setSort(e.target.value)}
+                      className="rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
+                    >
+                      {SORT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-sm text-gray-600">Rating:</span>
-                  <button
-                    type="button"
-                    onClick={() => setRatingValue(null)}
-                    className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      !searchParams.get("ratingValue")
-                        ? "border-indigo-600 bg-indigo-600 text-white"
-                        : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
-                  >
-                    All
-                  </button>
-                  {RATING_CHIPS.map((value) => (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-sm text-gray-600">Rating:</span>
                     <button
-                      key={value}
                       type="button"
-                      onClick={() => setRatingValue(value)}
+                      onClick={() => setRatingValue(null)}
                       className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                        searchParams.get("ratingValue") === value
+                        !searchParams.get("ratingValue")
                           ? "border-indigo-600 bg-indigo-600 text-white"
                           : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                       }`}
                     >
-                      {value}
+                      All
                     </button>
-                  ))}
-                </div>
+                    {RATING_CHIPS.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setRatingValue(value)}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          searchParams.get("ratingValue") === value
+                            ? "border-indigo-600 bg-indigo-600 text-white"
+                            : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                        }`}
+                      >
+                        {value}
+                      </button>
+                    ))}
+                  </div>
 
-                {searchParams.get("localAuthorityName") && (
+                  {searchParams.get("localAuthorityName") && (
+                    <button
+                      type="button"
+                      onClick={clearLocalAuthority}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                    >
+                      In {searchParams.get("localAuthorityName")}
+                      <span aria-hidden>✕</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {isLoading ? (
+                <ResultsSkeleton />
+              ) : results.length === 0 ? (
+                <p className="text-sm text-gray-500">
+                  No establishments found.{" "}
+                  {isNearbyMode ? "Try a wider radius." : "Try adjusting your search."}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-3">
+                  {results.map((result) => (
+                    <li key={result.id}>
+                      <Link
+                        href={establishmentPath(result.fhrsId, result.businessName)}
+                        className="flex gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+                      >
+                        <img
+                          src={getCategoryImagePath(result.businessTypeId)}
+                          alt=""
+                          className="h-20 w-20 shrink-0 rounded-lg object-cover"
+                          loading="lazy"
+                          width={80}
+                          height={80}
+                        />
+                        <div className="flex flex-1 items-start justify-between gap-4">
+                          <div>
+                            <p className="font-semibold text-gray-900">{result.businessName}</p>
+                            <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
+                            <p className="mt-1 text-sm text-gray-600">{formatAddress(result)}</p>
+                            {typeof result.distanceMiles === "number" && (
+                              <p className="mt-1 text-xs font-medium text-indigo-600">
+                                {result.distanceMiles.toFixed(1)} mi away
+                              </p>
+                            )}
+                          </div>
+                          <RatingBadge
+                            schemeType={result.schemeType}
+                            ratingValue={result.ratingValue}
+                            ratingDate={result.ratingDate}
+                          />
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {pagination && pagination.totalPages > 1 && (
+                <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:flex-row">
                   <button
                     type="button"
-                    onClick={clearLocalAuthority}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+                    onClick={() => goToPage(pagination.page - 1)}
+                    disabled={pagination.page <= 1}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    In {searchParams.get("localAuthorityName")}
-                    <span aria-hidden>✕</span>
+                    Previous
                   </button>
-                )}
-              </div>
-            )}
-
-            {isIdle && <RecentlyViewedStrip />}
-
-            {isIdle ? (
-              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-gray-300 bg-white px-6 py-12 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600">
-                  <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden>
-                    <circle cx="11" cy="11" r="7" strokeLinecap="round" strokeLinejoin="round" />
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35" />
-                  </svg>
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Search to see results</p>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Enter a business name, postcode, or business type above — or use &ldquo;Search near me&rdquo; —
-                    to find food hygiene ratings.
-                  </p>
+                  <span className="text-center text-sm text-gray-600">
+                    Page {pagination.page} of {pagination.totalPages} ({pagination.total} results)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goToPage(pagination.page + 1)}
+                    disabled={pagination.page >= pagination.totalPages}
+                    className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
                 </div>
-              </div>
-            ) : isLoading ? (
-              <ResultsSkeleton />
-            ) : results.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                No establishments found.{" "}
-                {isNearbyMode ? "Try a wider radius." : "Try adjusting your search."}
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-3">
-                {results.map((result) => (
-                  <li key={result.id}>
-                    <Link
-                      href={establishmentPath(result.fhrsId, result.businessName)}
-                      className="flex gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
-                    >
-                      <img
-                        src={getCategoryImagePath(result.businessTypeId)}
-                        alt=""
-                        className="h-20 w-20 shrink-0 rounded-lg object-cover"
-                        loading="lazy"
-                        width={80}
-                        height={80}
-                      />
-                      <div className="flex flex-1 items-start justify-between gap-4">
-                        <div>
-                          <p className="font-semibold text-gray-900">{result.businessName}</p>
-                          <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
-                          <p className="mt-1 text-sm text-gray-600">{formatAddress(result)}</p>
-                          {typeof result.distanceMiles === "number" && (
-                            <p className="mt-1 text-xs font-medium text-indigo-600">
-                              {result.distanceMiles.toFixed(1)} mi away
-                            </p>
-                          )}
-                        </div>
-                        <RatingBadge
-                          schemeType={result.schemeType}
-                          ratingValue={result.ratingValue}
-                          ratingDate={result.ratingDate}
-                        />
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
+              )}
+            </div>
 
-            {pagination && pagination.totalPages > 1 && (
-              <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => goToPage(pagination.page - 1)}
-                  disabled={pagination.page <= 1}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Previous
-                </button>
-                <span className="text-center text-sm text-gray-600">
-                  Page {pagination.page} of {pagination.totalPages} ({pagination.total} results)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => goToPage(pagination.page + 1)}
-                  disabled={pagination.page >= pagination.totalPages}
-                  className="rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Next
-                </button>
-              </div>
-            )}
+            <div className={`lg:sticky lg:top-20 lg:self-start ${mobileView === "list" ? "hidden lg:block" : ""}`}>
+              <EstablishmentMap points={mapPoints} onSearchThisArea={isNearbyMode ? handleSearchThisArea : undefined} />
+              {mapPointsTruncated && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Showing the nearest {MAP_POINT_LIMIT} matches on the map. Zoom or search a smaller area to see more.
+                </p>
+              )}
+            </div>
           </div>
-
-          <div className={`lg:sticky lg:top-20 lg:self-start ${mobileView === "list" ? "hidden lg:block" : ""}`}>
-            <EstablishmentMap points={mapPoints} onSearchThisArea={isNearbyMode ? handleSearchThisArea : undefined} />
-            {mapPointsTruncated && (
-              <p className="mt-2 text-xs text-gray-500">
-                Showing the nearest {MAP_POINT_LIMIT} matches on the map. Zoom or search a smaller area to see more.
-              </p>
-            )}
-          </div>
-        </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+// The idle homepage — shown instead of the (otherwise empty) list+map layout until the
+// visitor actually searches for something. A blank "search to see results" placeholder
+// wasted the entire page below the fold; this gives arriving visitors something to browse
+// immediately (mirroring how Tripadvisor/SquareMeal/TheFork's homepages work) and gives
+// the homepage real, crawlable content and internal links instead of client-only emptiness.
+function HomepageDiscovery() {
+  return (
+    <div className="flex flex-col gap-10">
+      <RecentlyViewedStrip />
+
+      <section>
+        <h2 className="text-lg font-semibold text-gray-900">Browse by category</h2>
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {BUSINESS_CATEGORIES.map((category) => (
+            <Link
+              key={category.slug}
+              // Categories with more than one raw FSA businessTypeId (e.g. supermarkets
+              // & shops) collapse to the first for this link — the search form's type
+              // filter only supports a single value, same as every other type-filter
+              // link in the app (see Breadcrumbs in the establishment page).
+              href={`/?businessTypeId=${category.businessTypeIds[0]}`}
+              className="group overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+            >
+              <img
+                src={`/categories/${category.slug}.jpg`}
+                alt=""
+                className="h-28 w-full object-cover transition group-hover:scale-105 sm:h-32"
+                loading="lazy"
+                width={400}
+                height={300}
+              />
+              <p className="p-3 text-sm font-medium text-gray-900">{category.label}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Popular areas</h2>
+          <Link href="/area" className="text-sm font-medium text-indigo-600 hover:underline">
+            See all areas
+          </Link>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-4">
+          {POPULAR_AREAS.map((area) => (
+            <Link
+              key={area.slug}
+              href={`/area/${area.slug}`}
+              className="text-sm text-gray-600 hover:text-indigo-600 hover:underline"
+            >
+              {area.name}
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
@@ -687,7 +749,7 @@ export function SearchPageContent() {
 function HeroStat({ label }: { label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <svg className="h-4 w-4 text-indigo-200" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden>
+      <svg className="h-4 w-4 text-white" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24" aria-hidden>
         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
       </svg>
       {label}
