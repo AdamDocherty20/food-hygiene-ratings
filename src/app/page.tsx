@@ -11,6 +11,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 // aren't meant to rank on their own anyway — that's what /area is for — so every variant
 // canonicalizes back to the bare homepage.
 export const metadata: Metadata = {
+  title: "UK Food Hygiene Ratings | Should I Eat Here",
   alternates: { canonical: SITE_URL },
 };
 
