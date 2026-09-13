@@ -107,6 +107,17 @@ export default function GuidePage() {
       </section>
 
       <section className="mt-8">
+        <h2 className="text-lg font-semibold text-gray-900">Curious how areas compare?</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          See{" "}
+          <Link href="/guide/best-rated-areas" className="text-indigo-600 hover:underline">
+            the UK&apos;s highest-rated areas for food hygiene
+          </Link>
+          , ranked by average FHRS score across every business we have data for.
+        </p>
+      </section>
+
+      <section className="mt-8">
         <h2 className="text-lg font-semibold text-gray-900">Browse ratings near you</h2>
         <p className="mt-2 text-sm text-gray-600">Jump straight to the top-rated places in some of the busiest areas, or see the full list.</p>
         <div className="mt-3 flex flex-wrap gap-2">
