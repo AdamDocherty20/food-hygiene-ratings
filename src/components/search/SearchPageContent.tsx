@@ -703,48 +703,22 @@ export function SearchPageContent() {
 // immediately (mirroring how Tripadvisor/SquareMeal/TheFork's homepages work) and gives
 // the homepage real, crawlable content and internal links instead of client-only emptiness.
 function HomepageDiscovery() {
-  const router = useRouter();
-
-  // Cuisine tiles are "near me, filtered by cuisine" first — same geolocation flow as the
-  // hero's own "Search near me" button — falling back to a plain nationwide cuisine search
-  // when location isn't available/granted, rather than blocking the click on a permission
-  // prompt result. Kept local to this component (not shared with handleUseLocation above)
-  // since it's a simpler one-shot action with its own fallback, not stateful UI.
-  function handleCuisineClick(slug: string) {
-    if (!("geolocation" in navigator)) {
-      router.push(`/?cuisine=${slug}`);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const params = new URLSearchParams();
-        params.set("lat", position.coords.latitude.toFixed(5));
-        params.set("lng", position.coords.longitude.toFixed(5));
-        params.set("radiusMiles", DEFAULT_RADIUS_MILES);
-        params.set("cuisine", slug);
-        router.push(`/?${params.toString()}`);
-      },
-      () => router.push(`/?cuisine=${slug}`),
-      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 5 * 60 * 1000 },
-    );
-  }
-
   return (
     <div className="flex flex-col gap-10">
       <RecentlyViewedStrip />
 
       <section>
-        <h2 className="text-lg font-semibold text-gray-900">Pick your cuisine</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Find nearby places serving what you&rsquo;re after — we&rsquo;ll ask for your location, or search nationwide if you&rsquo;d rather not share it.
+        <h2 className="text-center text-lg font-semibold text-gray-900">Pick your cuisine</h2>
+        <p className="mt-1 text-center text-sm text-gray-500">
+          Find nearby places serving what you&rsquo;re after — we&rsquo;ll ask for your location on the next page, or show
+          top-rated results nationwide if you&rsquo;d rather not share it.
         </p>
-        <div className="mt-4 flex gap-4 overflow-x-auto pb-2">
+        <div className="mt-4 flex flex-wrap justify-center gap-4">
           {CUISINES.map((cuisine) => (
-            <button
+            <Link
               key={cuisine.slug}
-              type="button"
-              onClick={() => handleCuisineClick(cuisine.slug)}
-              className="flex shrink-0 flex-col items-center gap-2 text-center"
+              href={`/cuisine/${cuisine.slug}`}
+              className="flex flex-col items-center gap-2 text-center"
             >
               <img
                 src={getCuisineImagePath(cuisine.slug)}
@@ -755,7 +729,7 @@ function HomepageDiscovery() {
                 height={200}
               />
               <span className="text-sm font-medium text-gray-900">{cuisine.label}</span>
-            </button>
+            </Link>
           ))}
         </div>
       </section>
