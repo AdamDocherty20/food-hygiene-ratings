@@ -17,6 +17,7 @@ import { BUSINESS_CATEGORIES, getCategoryImagePath } from "@/lib/business-catego
 import { CUISINES, getCuisineImagePath } from "@/lib/cuisines";
 import { formatAddress } from "@/lib/format";
 import { LOCAL_AUTHORITIES, LONDON_BOROUGHS } from "@/lib/local-authorities";
+import { FHRS_SCALE, FHRS_SCORE_COLOR_CLASSES } from "@/lib/rating-scale";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
@@ -769,6 +770,46 @@ function HomepageDiscovery() {
             </Link>
           ))}
         </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+          <div>
+            <p className="text-xs font-semibold tracking-wide text-indigo-600 uppercase">Understand the numbers</p>
+            <h2 className="mt-1 text-lg font-semibold text-gray-900">What does a food hygiene rating mean?</h2>
+          </div>
+          <Link href="/about" className="text-sm font-medium text-indigo-600 hover:underline">
+            Ratings explained →
+          </Link>
+        </div>
+        <div className="mt-5 grid grid-cols-3 gap-3 sm:grid-cols-6">
+          {FHRS_SCALE.map((entry) => (
+            <div
+              key={entry.score}
+              className="flex flex-col items-center gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2 py-4 text-center"
+            >
+              <span
+                className={`flex h-9 w-9 items-center justify-center rounded-md text-base font-bold text-white ${FHRS_SCORE_COLOR_CLASSES[entry.score]}`}
+              >
+                {entry.score}
+              </span>
+              <span className="text-xs font-medium text-gray-700">{entry.shortLabel}</span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-5 text-xs text-gray-500">
+          The 0-5 scale applies in England, Wales and Northern Ireland (FHRS). Scotland uses a separate pass /
+          improvement-required scheme (FHIS).{" "}
+          <a
+            href="https://ratings.food.gov.uk/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium text-indigo-600 hover:underline"
+          >
+            Check the official source
+          </a>
+          .
+        </p>
       </section>
 
       <section>

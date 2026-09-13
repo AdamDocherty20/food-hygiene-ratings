@@ -3,15 +3,30 @@
 // rating-specific explainer sentence, so the wording can't drift between the two.
 
 // FHRS (England, Wales & Northern Ireland) rates on a 0-5 scale. Order matches the badge
-// colouring used elsewhere in the app: 4-5 green, 2-3 amber, 0-1 red.
-export const FHRS_SCALE: { score: string; meaning: string }[] = [
-  { score: "5", meaning: "Hygiene standards are very good" },
-  { score: "4", meaning: "Hygiene standards are good" },
-  { score: "3", meaning: "Hygiene standards are generally satisfactory" },
-  { score: "2", meaning: "Some improvement is necessary" },
-  { score: "1", meaning: "Major improvement is necessary" },
-  { score: "0", meaning: "Urgent improvement is required" },
+// colouring used elsewhere in the app: 4-5 green, 2-3 amber, 0-1 red. `shortLabel` is the
+// FSA's own short-form wording for each score (used on their stickers/site) — kept here
+// alongside `meaning` (the fuller sentence used in the establishment-page explainer and
+// the About page's table) rather than as a separate list, so both stay in sync.
+export const FHRS_SCALE: { score: string; shortLabel: string; meaning: string }[] = [
+  { score: "5", shortLabel: "Very Good", meaning: "Hygiene standards are very good" },
+  { score: "4", shortLabel: "Good", meaning: "Hygiene standards are good" },
+  { score: "3", shortLabel: "Generally Satisfactory", meaning: "Hygiene standards are generally satisfactory" },
+  { score: "2", shortLabel: "Improvement Necessary", meaning: "Some improvement is necessary" },
+  { score: "1", shortLabel: "Major Improvement Necessary", meaning: "Major improvement is necessary" },
+  { score: "0", shortLabel: "Urgent Improvement Necessary", meaning: "Urgent improvement is required" },
 ];
+
+// A finer six-step gradient than getRatingBand's red/amber/green below — that 3-tier
+// grouping is right for small badges, but flattens 5-and-4 (or 1-and-0) into the same
+// colour, losing the distinction a score-by-score breakdown like this is meant to show.
+export const FHRS_SCORE_COLOR_CLASSES: Record<string, string> = {
+  "5": "bg-green-700",
+  "4": "bg-green-600",
+  "3": "bg-yellow-400",
+  "2": "bg-amber-500",
+  "1": "bg-orange-700",
+  "0": "bg-red-700",
+};
 
 // FHIS (Scotland) is pass/fail rather than a numeric scale.
 export const FHIS_SCALE: { score: string; meaning: string }[] = [
