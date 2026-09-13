@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { formatDate } from "@/lib/format";
 import { buildBlogPostingJsonLd, buildBreadcrumbJsonLd } from "@/lib/jsonld";
 import { prisma } from "@/lib/prisma";
@@ -76,7 +77,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       )}
 
       <div className="prose prose-sm sm:prose-base mt-6 max-w-none prose-headings:font-semibold prose-headings:text-gray-900 prose-a:text-indigo-600">
-        <Markdown>{post.content}</Markdown>
+        <Markdown remarkPlugins={[remarkGfm]}>{post.content}</Markdown>
       </div>
 
       <Link
