@@ -14,6 +14,12 @@ export function Footer() {
           <Link href="/about" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
             About &amp; FAQ
           </Link>
+          <Link href="/privacy" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+            Privacy Policy
+          </Link>
+          <Link href="/terms" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+            Terms
+          </Link>
         </p>
         <p className="mt-2">
           Food hygiene rating data provided by the{" "}
@@ -58,6 +64,10 @@ export function Footer() {
             className="font-medium text-indigo-600 underline-offset-2 hover:underline"
           >
             adamdocherty.com
+          </a>{" "}
+          · Contact:{" "}
+          <a href="mailto:adamdocherty100@gmail.com" className="font-medium text-indigo-600 underline-offset-2 hover:underline">
+            adamdocherty100@gmail.com
           </a>
         </p>
       </div>

@@ -3,6 +3,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
+import { StickyMobileCta } from "@/components/StickyMobileCta";
 import { buildOrganizationJsonLd, buildWebsiteJsonLd } from "@/lib/jsonld";
 import "./globals.css";
 
@@ -50,8 +51,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(buildWebsiteJsonLd()) }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(buildOrganizationJsonLd()) }} />
         <Header />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1 pb-16 sm:pb-0">{children}</main>
         <Footer />
+        <StickyMobileCta />
         <Analytics />
       </body>
     </html>
