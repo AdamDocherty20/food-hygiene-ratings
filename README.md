@@ -256,11 +256,22 @@ The easiest path is the [Vercel Platform](https://vercel.com/new?utm_medium=defa
 | `DATABASE_URL` | yes | See "pooled connection" below — don't reuse the direct connection string from local `.env` on a serverless host. |
 | `NEXT_PUBLIC_SITE_URL` | recommended | Your real domain, e.g. `https://example.com`. Used for Open Graph tags, `robots.txt`, and the sitemap. Defaults to `http://localhost:3000` if unset. |
 | `NEXT_PUBLIC_TILE_URL` / `NEXT_PUBLIC_TILE_ATTRIBUTION` | optional | Override the map tile source (see below). Both default to the free OpenStreetMap tiles if unset. |
+| `GOOGLE_PLACES_SERVER_API_KEY` / `NEXT_PUBLIC_GOOGLE_PLACES_BROWSER_API_KEY` | optional | Real establishment photos on the detail page (see below). Both unset by default — the page just shows the category placeholder image instead. |
 
 **Use Neon's pooled connection string in production.** The `DATABASE_URL` in local `.env` points at Neon's *direct* endpoint, which is fine for a single long-lived process (dev server, the sync script) but will exhaust Neon's connection limit under serverless traffic, where every function invocation can open its own connection. In the Neon dashboard, copy the *pooled* connection string instead (same credentials, hostname has `-pooler` in it) and use that as `DATABASE_URL` on the hosting platform.
 
 **Keep the data fresh.** `npm run sync` is still manual-only — nothing re-runs it automatically. `.github/workflows/sync.yml` runs it daily via GitHub Actions (host-agnostic, works no matter where the app itself is deployed) once the repo is pushed to GitHub and a `DATABASE_URL` secret is added under Settings → Secrets and variables → Actions. Without that secret, the workflow will fail — either add it or disable the workflow if you'd rather sync manually.
 
 **Map tiles.** The map defaults to the free `tile.openstreetmap.org` servers, which is fine for casual/dev traffic, but OSM's usage policy asks higher-volume sites to move to a paid provider (MapTiler, Stadia Maps, Mapbox, etc.) instead of hot-linking their free tiles. If this gets real traffic, sign up with one of those, then set `NEXT_PUBLIC_TILE_URL` and `NEXT_PUBLIC_TILE_ATTRIBUTION` to the values they give you — no code change needed.
+
+**Real establishment photos (optional, has real per-visitor cost).** By default every establishment shows a generic category photo (see `public/categories/`). To show a real photo of the actual business instead, wire up the Places API (New):
+
+1. In Google Cloud Console, create/select a project and enable **"Places API (New)"**, then enable billing on it.
+2. Create two API keys:
+   - A **server key**, no referrer restriction, kept secret — set as `GOOGLE_PLACES_SERVER_API_KEY`.
+   - A **browser key** restricted by **HTTP referrer** to your domain — set as `NEXT_PUBLIC_GOOGLE_PLACES_BROWSER_API_KEY`. This one is safe to expose client-side because the referrer restriction stops it working from anywhere else.
+3. Set a billing budget alert (and ideally a hard cap) on the project before going live — this is not a flat-fee feature.
+
+Cost shape: the "find this business on Google" lookup (Text Search) runs once per establishment ever and is cached forever; "get the photo reference" (Place Details) runs at most once per hour per establishment, thanks to the detail page's existing hourly revalidation. Neither is likely to cost much. The photo itself (Place Photo) is requested directly by each visitor's browser and is *not* deduplicated by any caching here — Google's current pricing has a free allowance of 1,000 Place Photo requests/month, then charges per request above that (check [Google's current pricing](https://developers.google.com/maps/billing-and-pricing/pricing) — it changes). Without both env vars set, none of this runs and the category photo is used, at no cost.
 
 **Not included yet:** a shared (cross-instance) rate limit store, and any monitoring/error tracking. Fine for a modest public launch; worth revisiting if traffic grows a lot.

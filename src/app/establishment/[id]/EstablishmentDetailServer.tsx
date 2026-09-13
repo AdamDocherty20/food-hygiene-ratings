@@ -477,6 +477,7 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
     company,
     chain,
     osm,
+    photo,
   } = detail;
   const isNumericFhrs = establishment.schemeType === "FHRS" && NUMERIC_FHRS_VALUES.has(establishment.ratingValue);
 
@@ -487,13 +488,22 @@ export function EstablishmentDetailHero({ detail }: { detail: EstablishmentDetai
       <div
         className={`mt-4 overflow-hidden rounded-xl border border-l-4 border-gray-200 bg-white shadow-sm ${ratingAccentClasses(establishment.schemeType, establishment.ratingValue)}`}
       >
-        <img
-          src={getCategoryImagePath(establishment.businessTypeId)}
-          alt=""
-          className="h-48 w-full object-cover sm:h-64"
-          width={1200}
-          height={800}
-        />
+        <div className="relative">
+          <img
+            src={photo?.url ?? getCategoryImagePath(establishment.businessTypeId)}
+            alt=""
+            className="h-48 w-full object-cover sm:h-64"
+            width={1200}
+            height={800}
+          />
+          {/* Google's Places API terms require attribution wherever a photo is shown —
+              not just a courtesy credit like the category placeholder art needs none of. */}
+          {photo?.attribution && (
+            <p className="absolute right-2 bottom-2 rounded bg-black/50 px-1.5 py-0.5 text-[11px] text-white">
+              Photo: {photo.attribution}
+            </p>
+          )}
+        </div>
 
         <div className="p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">

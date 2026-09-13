@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
 import { boundingBoxDelta, distanceMilesSql } from "@/lib/geo";
+import { getEstablishmentPhoto, type EstablishmentPhoto } from "@/lib/google-places";
 import { prisma } from "@/lib/prisma";
 import { computeRatingTrajectory, type RatingTrajectory } from "@/lib/rating-trajectory";
 import type { Establishment, NearbyEstablishmentSummary, OtherLocation, RatingHistoryEntry } from "@/lib/types";
@@ -241,6 +242,8 @@ export interface EstablishmentDetailData {
   chain: ChainInfo | null;
   /** OpenStreetMap match, if any — see getOsmInfo. */
   osm: OsmInfo | null;
+  /** A real photo of this establishment via Google Places, if available — see getEstablishmentPhoto. */
+  photo: EstablishmentPhoto | null;
 }
 
 /**
@@ -261,7 +264,7 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
   const { latitude, longitude } = establishment;
   const hasCoords = latitude !== null && longitude !== null;
 
-  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company, chain, osm] =
+  const [localAuthorityAverageRating, nearbyBusinessTypeAverageRating, otherLocations, ratingHistory, nearby, company, chain, osm, photo] =
     await Promise.all([
       isNumericFhrs ? getLocalAuthorityAverageRating(establishment.localAuthorityCode) : Promise.resolve(null),
       isNumericFhrs && hasCoords
@@ -273,6 +276,7 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
       getCompanyInfo(establishment.fhrsId),
       getChainInfo(establishment.fhrsId),
       getOsmInfo(establishment.fhrsId),
+      getEstablishmentPhoto(establishment),
     ]);
 
   return {
@@ -292,5 +296,6 @@ export async function getEstablishmentDetailData(fhrsId: number): Promise<Establ
     company,
     chain,
     osm,
+    photo,
   };
 }

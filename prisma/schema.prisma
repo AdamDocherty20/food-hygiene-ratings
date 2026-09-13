@@ -190,3 +190,21 @@ model OsmMatch {
 
   @@index([matchMethod])
 }
+
+// One row per FSA establishment we've ever looked up against the Google Places API (New)
+// — written lazily by src/lib/google-places.ts the first time that establishment's detail
+// page is rendered, not by a batch script (unlike the other match models above), since
+// Place Photo requests are billed per-use and this app has 611k+ establishments. Only
+// googlePlaceId is cached: Google's Places API (New) terms explicitly forbid caching photo
+// *names* ("You cannot cache a photo name... the name can expire"), so the photo itself is
+// always re-resolved via a fresh Place Details call at render time, not stored here.
+// googlePlaceId is null when a search found no matching place — cached anyway so a
+// business with no Google listing isn't re-searched on every page regeneration.
+model PlacePhotoMatch {
+  id Int @id @default(autoincrement())
+
+  fhrsId        Int     @unique
+  googlePlaceId String?
+
+  matchedAt DateTime @default(now())
+}
