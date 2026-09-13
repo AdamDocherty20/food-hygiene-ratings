@@ -16,7 +16,7 @@ import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
 import { BUSINESS_CATEGORIES, getCategoryImagePath } from "@/lib/business-categories";
 import { CUISINES, getCuisineImagePath } from "@/lib/cuisines";
 import { formatAddress } from "@/lib/format";
-import { LOCAL_AUTHORITIES } from "@/lib/local-authorities";
+import { LOCAL_AUTHORITIES, LONDON_BOROUGHS } from "@/lib/local-authorities";
 import { establishmentPath } from "@/lib/slug";
 import type { BusinessType, Establishment, PaginationMeta } from "@/lib/types";
 
@@ -43,7 +43,17 @@ const RATING_CHIPS = ["5", "4", "3", "2", "1", "0"];
 // establishment count, since those are the places a visitor is most likely to be
 // searching from. LOCAL_AUTHORITIES is already static (see local-authorities.ts), so this
 // sort/slice only needs to happen once at module load, not on every render.
-const POPULAR_AREAS = [...LOCAL_AUTHORITIES].sort((a, b) => b.count - a.count).slice(0, 24);
+//
+// London is prepended as a synthetic entry (it has no local authority of its own — see
+// /area/london and LONDON_BOROUGHS) with its 33 boroughs' combined count, which dwarfs
+// every real entry here; leaving it out of this list entirely, the way it's already
+// absent from LOCAL_AUTHORITIES, would make the UK's biggest city invisible on the
+// homepage.
+const LONDON_COUNT = LOCAL_AUTHORITIES.filter((a) => LONDON_BOROUGHS.includes(a.name)).reduce((sum, a) => sum + a.count, 0);
+const POPULAR_AREAS = [
+  { name: "London", slug: "london", count: LONDON_COUNT },
+  ...[...LOCAL_AUTHORITIES].sort((a, b) => b.count - a.count).slice(0, 23),
+];
 
 // A search result, optionally annotated with distanceMiles when it came from the
 // "near me" (nearby) endpoint rather than the name/postcode/type search endpoint.

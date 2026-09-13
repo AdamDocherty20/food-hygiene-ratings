@@ -44,13 +44,21 @@ export interface TopRatedInArea {
  * the rest were effectively orphaned as far as crawl priority goes.
  */
 export async function getTopRatedInArea(
-  localAuthorityName: string,
+  localAuthorityName: string | string[],
   businessTypeIds?: number[],
   page: number = 1,
 ): Promise<TopRatedInArea> {
   const rankExpr = ratingRankSql();
 
-  const conditions = [Prisma.sql`"isActive" = true`, Prisma.sql`"localAuthorityName" = ${localAuthorityName}`];
+  // A string[] powers /area/london — London has no single local authority of its own (it's
+  // split across 33 boroughs, see LONDON_BOROUGHS in local-authorities.ts), so that page
+  // needs "in any of these" rather than "equals this one" — every other caller still passes
+  // a plain string and gets the original equality behaviour.
+  const authorityCondition = Array.isArray(localAuthorityName)
+    ? Prisma.sql`"localAuthorityName" IN (${Prisma.join(localAuthorityName)})`
+    : Prisma.sql`"localAuthorityName" = ${localAuthorityName}`;
+
+  const conditions = [Prisma.sql`"isActive" = true`, authorityCondition];
   if (businessTypeIds && businessTypeIds.length > 0) {
     conditions.push(Prisma.sql`"businessTypeId" IN (${Prisma.join(businessTypeIds)})`);
   }
@@ -69,7 +77,7 @@ export async function getTopRatedInArea(
     prisma.establishment.count({
       where: {
         isActive: true,
-        localAuthorityName,
+        localAuthorityName: Array.isArray(localAuthorityName) ? { in: localAuthorityName } : localAuthorityName,
         ...(businessTypeIds && businessTypeIds.length > 0 ? { businessTypeId: { in: businessTypeIds } } : {}),
       },
     }),

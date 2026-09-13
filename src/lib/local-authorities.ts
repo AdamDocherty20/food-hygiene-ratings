@@ -391,3 +391,46 @@ export function getLocalAuthorityBySlug(slug: string): LocalAuthority | null {
 export function getLocalAuthorityByName(name: string): LocalAuthority | null {
   return BY_NAME.get(name) ?? null;
 }
+
+// The 32 London boroughs plus the City of London — spelled exactly as they appear in the
+// FSA's own localAuthorityName field (verified against this file's own data, not assumed —
+// note the two hyphenated exceptions, "Kingston-Upon-Thames" and "Richmond-Upon-Thames",
+// which don't follow the space-separated pattern every other multi-word authority here
+// uses). Used by /area/london, a bespoke hub page: unlike every other UK city of
+// comparable size, London has no single local authority of its own for /area/[slug] to
+// resolve, so that page is a dedicated route rather than a dynamic-slug special case.
+export const LONDON_BOROUGHS = [
+  "Barking and Dagenham",
+  "Barnet",
+  "Bexley",
+  "Brent",
+  "Bromley",
+  "Camden",
+  "City of London Corporation",
+  "Croydon",
+  "Ealing",
+  "Enfield",
+  "Greenwich",
+  "Hackney",
+  "Hammersmith and Fulham",
+  "Haringey",
+  "Harrow",
+  "Havering",
+  "Hillingdon",
+  "Hounslow",
+  "Islington",
+  "Kensington and Chelsea",
+  "Kingston-Upon-Thames",
+  "Lambeth",
+  "Lewisham",
+  "Merton",
+  "Newham",
+  "Redbridge",
+  "Richmond-Upon-Thames",
+  "Southwark",
+  "Sutton",
+  "Tower Hamlets",
+  "Waltham Forest",
+  "Wandsworth",
+  "Westminster",
+];

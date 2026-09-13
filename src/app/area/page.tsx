@@ -45,6 +45,18 @@ export default function AreaIndexPage() {
         {LOCAL_AUTHORITIES.length} UK local authorities — pick one to see the best-rated food businesses there.
       </p>
 
+      {/* London spans 33 separate boroughs in the FSA data with no single local authority
+          of its own (see /area/london), so it doesn't appear in the alphabetical list below
+          at all — called out here instead of leaving the UK's biggest city undiscoverable
+          from this page. */}
+      <Link
+        href="/area/london"
+        className="mt-6 flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-medium text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100"
+      >
+        London (all 33 boroughs)
+        <span aria-hidden>→</span>
+      </Link>
+
       <div className="mt-8 columns-2 gap-8 sm:columns-3 lg:columns-4">
         {[...grouped.entries()].map(([letter, authorities]) => (
           <div key={letter} className="mb-6 break-inside-avoid">
