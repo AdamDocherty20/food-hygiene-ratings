@@ -167,17 +167,6 @@ export function RankingsReport({ stats, regional, minSample, dataUpdatedAt }: Ra
         </ul>
       </div>
 
-      <blockquote className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50 p-5 text-sm text-gray-700">
-        <p>
-          &ldquo;A hygiene rating is the closest you&apos;ll get to seeing the kitchen before you order. Most of the
-          country does well, but the gap between the top and bottom of this table is bigger than people expect. In
-          some areas almost every business has a 5. In others it&apos;s closer to one in two. That doesn&apos;t make
-          any single restaurant unsafe. It just means it&apos;s worth ten seconds to look up the rating before you
-          book or order in.&rdquo;
-        </p>
-        <footer className="mt-2 text-xs font-semibold text-gray-500">— Adam Docherty, founder of Should I Eat Here</footer>
-      </blockquote>
-
       <nav className="mt-8 rounded-xl border border-gray-200 bg-white p-5" aria-label="Report contents">
         <h3 className="text-sm font-semibold tracking-wide text-gray-700 uppercase">Contents</h3>
         <ul className="mt-3 flex flex-col gap-1.5 text-sm">
@@ -447,11 +436,11 @@ export function RankingsReport({ stats, regional, minSample, dataUpdatedAt }: Ra
         <div className="mt-3 flex max-w-3xl flex-col gap-3 text-sm text-gray-600">
           <p>
             An area&apos;s average only means as much as the sample behind it. A {ranked[1].averageRating.toFixed(2)}{" "}
-            average across more than {Math.floor(ranked[1].ratedCount / 1000)},000 rated businesses, as in{" "}
+            average across {ranked[1].ratedCount.toLocaleString("en-GB")} rated businesses, as in{" "}
             {ranked[1].localAuthorityName}, reflects thousands of individual inspections. A similar average from an
             area nearer this ranking&apos;s minimum of {minSample} rated businesses rests on a much smaller sample,
-            so read it with a bit more caution. {smallestSampleInTop30.localAuthorityName} ({smallestSampleInTop30.rank}
-            th, with {smallestSampleInTop30.ratedCount} rated businesses) is the clearest example here.
+            so read it with a bit more caution. {smallestSampleInTop30.localAuthorityName} ({ordinal(smallestSampleInTop30.rank)}
+            , with {smallestSampleInTop30.ratedCount} rated businesses) is the clearest example here.
           </p>
           <p>
             Many of the highest-scoring areas are rural or semi-rural district councils, including{" "}
