@@ -1,5 +1,6 @@
 import { Prisma } from "@/generated/prisma/client";
-import { getLocalAuthorityByName } from "@/lib/local-authorities";
+import { getLocalAuthorityByName, LONDON_BOROUGHS } from "@/lib/local-authorities";
+import { getNation, type Nation } from "@/lib/local-authority-nations";
 import { prisma } from "@/lib/prisma";
 import { ratingRankSql } from "@/lib/rating-rank";
 
@@ -172,4 +173,89 @@ export async function getAreaHygieneStats(minSample: number = MIN_COMPARE_AREA_S
         count0To2: Number(row.count0to2),
       };
     });
+}
+
+export interface RegionBreakdownEntry {
+  areas: number;
+  ratedCount: number;
+  pctRated5: number;
+}
+
+export interface RegionalHygieneBreakdown {
+  nations: (RegionBreakdownEntry & { nation: Nation })[];
+  london: RegionBreakdownEntry;
+  restOfUk: RegionBreakdownEntry;
+  ukTotal: RegionBreakdownEntry;
+}
+
+const NATION_ORDER: Nation[] = ["England", "Wales", "Northern Ireland", "Scotland"];
+
+/**
+ * Nation- and London-level rollups for /food-hygiene-map's "how the nations, cities and
+ * London compare" content. Deliberately unthresholded (every active FHRS establishment
+ * counts, regardless of MIN_COMPARE_AREA_SAMPLE) — that per-area minimum exists so a tiny
+ * authority can't rank misleadingly well or badly against its peers, but it has no
+ * bearing on a genuine "how many businesses does this nation have and what share are
+ * rated 5" total, which should include every area's real businesses.
+ */
+export async function getRegionalHygieneBreakdown(): Promise<RegionalHygieneBreakdown> {
+  const rows = await prisma.$queryRaw<{ localAuthorityName: string; count5: bigint; ratedCount: bigint }[]>`
+    SELECT "localAuthorityName",
+      COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" = '5') AS count5,
+      COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" ~ '^[0-5]$') AS "ratedCount"
+    FROM "Establishment"
+    WHERE "isActive" = true
+    GROUP BY "localAuthorityName"
+  `;
+
+  const byNation = new Map<Nation, { areas: number; count5: number; ratedCount: number }>();
+  const london = { areas: 0, count5: 0, ratedCount: 0 };
+  const londonSet = new Set(LONDON_BOROUGHS);
+
+  for (const row of rows) {
+    const ratedCount = Number(row.ratedCount);
+    if (ratedCount === 0) continue;
+    const count5 = Number(row.count5);
+    const nation = getNation(row.localAuthorityName);
+
+    if (nation) {
+      const entry = byNation.get(nation) ?? { areas: 0, count5: 0, ratedCount: 0 };
+      entry.areas += 1;
+      entry.count5 += count5;
+      entry.ratedCount += ratedCount;
+      byNation.set(nation, entry);
+    }
+
+    if (londonSet.has(row.localAuthorityName)) {
+      london.areas += 1;
+      london.count5 += count5;
+      london.ratedCount += ratedCount;
+    }
+  }
+
+  const pct = (count5: number, ratedCount: number) => (ratedCount > 0 ? Math.round((count5 / ratedCount) * 1000) / 10 : 0);
+
+  const nations = NATION_ORDER.filter((n) => n !== "Scotland" && byNation.has(n)).map((nation) => {
+    const entry = byNation.get(nation)!;
+    return { nation, areas: entry.areas, ratedCount: entry.ratedCount, pctRated5: pct(entry.count5, entry.ratedCount) };
+  });
+
+  // UK total here means England + Wales + Northern Ireland — everywhere with a numeric
+  // FHRS score. Scotland's FHIS scale has no equivalent "rated 5" figure to combine in.
+  const ukCount5 = nations.reduce((sum, n) => sum + byNation.get(n.nation)!.count5, 0);
+  const ukRatedCount = nations.reduce((sum, n) => sum + n.ratedCount, 0);
+  const ukAreas = nations.reduce((sum, n) => sum + n.areas, 0);
+
+  const restOfUk = {
+    areas: ukAreas - london.areas,
+    ratedCount: ukRatedCount - london.ratedCount,
+    pctRated5: pct(ukCount5 - london.count5, ukRatedCount - london.ratedCount),
+  };
+
+  return {
+    nations,
+    london: { areas: london.areas, ratedCount: london.ratedCount, pctRated5: pct(london.count5, london.ratedCount) },
+    restOfUk,
+    ukTotal: { areas: ukAreas, ratedCount: ukRatedCount, pctRated5: pct(ukCount5, ukRatedCount) },
+  };
 }

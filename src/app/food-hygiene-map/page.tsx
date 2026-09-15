@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { AreaRankings } from "@/components/foodHygieneMap/AreaRankings";
 import { FoodHygieneMapClient } from "@/components/foodHygieneMap/FoodHygieneMapClient";
-import { getAreaHygieneStats, MIN_COMPARE_AREA_SAMPLE } from "@/lib/area-queries";
+import { RankingsReport } from "@/components/foodHygieneMap/RankingsReport";
+import { getAreaHygieneStats, getRegionalHygieneBreakdown, MIN_COMPARE_AREA_SAMPLE } from "@/lib/area-queries";
+import { rankAreas } from "@/lib/area-rankings";
 import { formatDate } from "@/lib/format";
 import { buildBreadcrumbJsonLd, buildItemListJsonLd } from "@/lib/jsonld";
 import { prisma } from "@/lib/prisma";
@@ -33,8 +34,8 @@ export default async function FoodHygieneMapPage() {
   const latestSync = await prisma.establishment.aggregate({ _max: { lastSeenAt: true }, where: { isActive: true } });
   const dataUpdatedAt = formatDate(latestSync._max.lastSeenAt?.toISOString() ?? null);
 
-  const areaStats = await getAreaHygieneStats();
-  const rankedAreas = [...areaStats].sort((a, b) => b.averageRating - a.averageRating);
+  const [areaStats, regionalBreakdown] = await Promise.all([getAreaHygieneStats(), getRegionalHygieneBreakdown()]);
+  const rankedAreas = rankAreas(areaStats);
 
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Home", url: SITE_URL },
@@ -42,7 +43,8 @@ export default async function FoodHygieneMapPage() {
   ]);
 
   // The top 10 is the most citation-worthy slice of the rankings below — eligible for a
-  // rich "list" result in search.
+  // rich "list" result in search. Built from the same rankAreas() output the page itself
+  // renders, so the two can never disagree about order.
   const top10JsonLd = buildItemListJsonLd({
     name: "UK's best-rated areas for food hygiene",
     description: "UK local authorities ranked by average Food Hygiene Rating Scheme (FHRS) score.",
@@ -84,59 +86,14 @@ export default async function FoodHygieneMapPage() {
         </Suspense>
       </div>
 
-      <AreaRankings stats={areaStats} minSample={MIN_COMPARE_AREA_SAMPLE} dataUpdatedAt={dataUpdatedAt} />
+      <RankingsReport
+        stats={areaStats}
+        regional={regionalBreakdown}
+        minSample={MIN_COMPARE_AREA_SAMPLE}
+        dataUpdatedAt={dataUpdatedAt}
+      />
 
-      <section className="mt-10 border-t border-gray-200 pt-8">
-        <h2 className="text-lg font-semibold text-gray-900">What the rankings show</h2>
-        <div className="mt-3 flex max-w-3xl flex-col gap-3 text-sm text-gray-600">
-          <p>
-            An area&apos;s average score only means as much as the sample behind it. A 4.94 average across more than
-            4,000 rated businesses, as in Dorset, reflects thousands of individual inspections settling into a
-            consistent pattern over time. A similar average from an area nearer this ranking&apos;s minimum of{" "}
-            {MIN_COMPARE_AREA_SAMPLE} rated businesses carries a much smaller sample, and should be read with a bit
-            more caution.
-          </p>
-          <p>
-            Several of the highest-scoring areas in this ranking are rural or semi-rural district councils — Dorset,
-            Forest of Dean, Cotswold, North Kesteven and West Oxfordshire all sit near the top, alongside larger
-            towns such as Thanet, Ipswich, Wrexham and Stockton-on-Tees. Businesses in these areas tend to see lower
-            staff turnover, and in some cases a smaller share of the higher-risk premises — large-scale takeaways and
-            fast-food outlets among them — that make up a bigger proportion of food businesses in busy city centres.
-          </p>
-          <p>
-            The lower end leans towards dense, urban local authorities. Newham, Waltham Forest, Ealing, Barking and
-            Dagenham, Enfield and Camden — all London boroughs — sit among the lowest average scores, alongside
-            Wigan, Bolton and Walsall. This is worth reading as a pattern rather than a verdict on any one borough: a
-            higher concentration of food businesses generally means a higher concentration of every type of business,
-            including the kind more likely to pick up a lower score on a given inspection, such as independent
-            takeaways and small kitchens with high staff turnover. It&apos;s not proof of a single cause — Blaenau
-            Gwent&apos;s presence on the same list, a small post-industrial Welsh valleys authority with little in
-            common with inner London, is a reminder that no single explanation fits every area here.
-          </p>
-          <p>
-            None of this means a specific restaurant in a lower-scoring area is unsafe, or that every business in a
-            top-ranked one is spotless. An area&apos;s average is calculated across every FHRS-rated business
-            currently active there, weighted equally regardless of size or type, so it smooths out a lot of
-            individual variation. A newly opened business still &ldquo;Awaiting Inspection&rdquo;, one that&apos;s
-            had a poor inspection but not yet had the chance to fix and request a re-visit, and a handful of
-            long-established five-rated regulars can all sit within the same borough&apos;s average.
-          </p>
-          <p>
-            If you&apos;re checking somewhere specific, this ranking is a starting point, not a substitute for
-            looking up the business itself. Every establishment on this site links through to its own page, showing
-            its current rating, the date of its most recent inspection, and its rating history where available —
-            that&apos;s the figure that actually matters before you book a table or order in. Use the map above to
-            explore ratings street by street, or search directly for a business or postcode.
-          </p>
-          <p>
-            All figures are drawn from the Food Standards Agency&apos;s own published data and recalculated daily —
-            see the methodology below for how the averages and sample threshold are worked out. Feel free to
-            reference or link to this page if you&apos;re writing about UK food hygiene standards.
-          </p>
-        </div>
-      </section>
-
-      <section className="mt-10 border-t border-gray-200 pt-8">
+      <section id="methodology" className="mt-10 scroll-mt-20 border-t border-gray-200 pt-8">
         <h2 className="text-lg font-semibold text-gray-900">Methodology</h2>
         <div className="mt-6 grid grid-cols-1 gap-8 sm:grid-cols-2">
           <div>
@@ -171,32 +128,62 @@ export default async function FoodHygieneMapPage() {
             </ul>
             <p className="mt-2 text-sm text-gray-600">
               Scotland uses a separate scheme, the Food Hygiene Information Scheme (FHIS), which awards Pass or
-              Improvement Required rather than a numeric score — Scottish establishments appear on the map with
-              their actual FHIS status rather than a converted 0-5 rating.
+              Improvement Required rather than a numeric score. Scottish businesses appear on the map with their
+              FHIS result, but Scotland isn&apos;t included in the rankings above because there&apos;s no numeric
+              score to average.
+            </p>
+
+            <h3 className="mt-6 text-base font-semibold text-gray-900">How often it updates</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              The underlying data syncs daily, so the live rankings and Compare areas map can shift day to day. Rely
+              on the &ldquo;Data last updated&rdquo; date at the top of this page for exactly how current the figures
+              you&apos;re looking at are, rather than assuming they match any earlier visit.
             </p>
           </div>
 
           <div>
-            <h3 className="text-base font-semibold text-gray-900">How often the data updates</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              A sync job pulls the latest ratings from the Food Standards Agency once a day, so a newly published
-              inspection result typically appears here within 24 hours.
-            </p>
+            <h3 className="text-base font-semibold text-gray-900">How the ranking works</h3>
+            <ul className="mt-2 flex flex-col gap-2 text-sm text-gray-600">
+              <li>
+                Each local authority is ranked by its average FHRS rating (0-5) across all currently rated
+                businesses, with every business weighted equally.
+              </li>
+              <li>Ties (areas sharing the same average to two decimal places) are broken by the larger rated-business sample, then alphabetically.</li>
+              <li>&ldquo;Rated 5&rdquo; is the percentage of an area&apos;s rated businesses holding a 5.</li>
+              <li>Businesses awaiting inspection, exempt, or without a numeric rating aren&apos;t counted.</li>
+              <li>
+                An area is only ranked once it has at least {MIN_COMPARE_AREA_SAMPLE} numerically rated businesses,
+                so a small sample can&apos;t produce a misleadingly perfect (or poor) result. Areas below that
+                threshold, and all of Scotland, are shown in grey on the Compare areas map rather than omitted
+                silently.
+              </li>
+              <li>
+                Nation and London figures are calculated across every rated business in those areas combined —
+                unlike the area ranking itself, they have no minimum-sample threshold, so larger authorities
+                naturally carry more weight in the total.
+              </li>
+              <li>
+                Nation groupings follow each local authority&apos;s location. London covers the 32 London boroughs
+                plus the City of London Corporation. The major cities table uses the UK Core Cities group, minus
+                Glasgow, since Scotland isn&apos;t ranked here.
+              </li>
+            </ul>
 
-            <h3 className="mt-6 text-base font-semibold text-gray-900">Rankings &amp; Compare areas methodology</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              Both the rankings above and Compare areas use UK local authorities&apos; Food Hygiene Rating Scheme
-              (FHRS) statistics only — average rating, and the percentage of rated establishments scoring 5, 4-5, or
-              0-2. Scotland&apos;s FHIS scheme has no numeric score to average or bucket this way, so Scottish local
-              authorities are excluded from these specific calculations rather than shown with a converted or
-              estimated figure.
-            </p>
-            <p className="mt-2 text-sm text-gray-600">
-              An area only appears in the rankings, and is shaded on the Compare areas map, once it has at least{" "}
-              {MIN_COMPARE_AREA_SAMPLE} numerically rated establishments, so a small sample size can&apos;t produce a
-              misleadingly perfect (or poor) score — areas below that threshold, and all of Scotland, are shown in
-              grey on the map rather than omitted silently.
-            </p>
+            <h3 className="mt-6 text-base font-semibold text-gray-900">Sources</h3>
+            <ul className="mt-2 flex flex-col gap-1 text-sm text-gray-600">
+              <li>Food Standards Agency, food hygiene rating data (Open Government Licence)</li>
+              <li>
+                Chartered Institute of Environmental Health,{" "}
+                <a
+                  href="https://www.cieh.org/policy/campaigns/mandatory-display-of-food-hygiene-ratings/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 hover:underline"
+                >
+                  mandatory display of food hygiene ratings
+                </a>
+              </li>
+            </ul>
           </div>
         </div>
       </section>
