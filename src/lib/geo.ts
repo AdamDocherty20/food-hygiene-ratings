@@ -60,3 +60,38 @@ export function distanceMilesSql(lat: number, lng: number) {
     ))
   )`;
 }
+
+export interface BoundingBox {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+/**
+ * Parses the north/south/east/west query params shared by every viewport-driven map
+ * endpoint (see /api/establishments/map-clusters) — a plain rectangle, not a
+ * distance-from-point radius like the nearby/* routes above, since a Leaflet map reports
+ * its visible area as `getBounds()`, not a center + radius.
+ */
+export function parseBoundingBox(searchParams: URLSearchParams): ParseResult<BoundingBox> {
+  const north = parseRequiredCoordinate(searchParams.get("north"), "north", -90, 90);
+  if (!north.ok) return north;
+  const south = parseRequiredCoordinate(searchParams.get("south"), "south", -90, 90);
+  if (!south.ok) return south;
+  const east = parseRequiredCoordinate(searchParams.get("east"), "east", -180, 180);
+  if (!east.ok) return east;
+  const west = parseRequiredCoordinate(searchParams.get("west"), "west", -180, 180);
+  if (!west.ok) return west;
+
+  if (south.value > north.value) {
+    return { ok: false, error: `"south" (${south.value}) must not exceed "north" (${north.value}).` };
+  }
+  // A UK-focused map never needs to query a viewport that wraps the antimeridian, so a
+  // west > east box is simplest treated as bad input rather than as a wrapping query.
+  if (west.value > east.value) {
+    return { ok: false, error: `"west" (${west.value}) must not exceed "east" (${east.value}).` };
+  }
+
+  return { ok: true, value: { north: north.value, south: south.value, east: east.value, west: west.value } };
+}

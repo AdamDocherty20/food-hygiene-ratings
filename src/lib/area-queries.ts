@@ -1,4 +1,5 @@
 import { Prisma } from "@/generated/prisma/client";
+import { getLocalAuthorityByName } from "@/lib/local-authorities";
 import { prisma } from "@/lib/prisma";
 import { ratingRankSql } from "@/lib/rating-rank";
 
@@ -124,4 +125,91 @@ export async function getAreaRatingLeaderboard(limit: number = 20): Promise<Area
     averageRating: Math.round(row.avg * 100) / 100,
     ratedCount: Number(row.count),
   }));
+}
+
+// The minimum number of *numerically rated* (FHRS 0-5) establishments a local authority
+// needs before it's included in Compare Areas at all — without this, an authority with a
+// handful of establishments could show a misleading 100%-rated-5 purely from small-sample
+// noise. Deliberately lower than MIN_LEADERBOARD_SAMPLE above: that leaderboard is a
+// curated "best in the UK" ranking meant to hold up to real scrutiny, while Compare Areas
+// is an exploratory map where a visitor picks their own area — a smaller, still-meaningful
+// sample is more useful there than hiding most of the country. A single named constant
+// (rather than inlining 50 below) so this is easy to retune later.
+export const MIN_COMPARE_AREA_SAMPLE = 50;
+
+export interface AreaHygieneStats {
+  localAuthorityName: string;
+  slug: string | null;
+  lat: number;
+  lng: number;
+  ratedCount: number;
+  averageRating: number;
+  pctRated5: number;
+  pctRated4Or5: number;
+  pctRated0To2: number;
+  count0: number;
+  count0To2: number;
+}
+
+interface AreaHygieneStatsRow {
+  localAuthorityName: string;
+  ratedCount: bigint;
+  avg: number;
+  count5: bigint;
+  count4or5: bigint;
+  count0to2: bigint;
+  count0: bigint;
+  lat: number | null;
+  lng: number | null;
+}
+
+/**
+ * Per-local-authority hygiene statistics for the /food-hygiene-map "Compare areas" mode.
+ * FHRS-only (England/Wales/NI) for every rated-establishment calculation, same reasoning
+ * as getAreaRatingLeaderboard above — Scotland's FHIS scale has no numeric score to
+ * average or bucket into "rated 5" / "rated 0-2", so mixing it in would be meaningless
+ * rather than just incomplete. Scottish-only authorities simply won't meet the
+ * `ratedCount >= minSample` bar and are absent from the result, not shown with fabricated
+ * numbers.
+ *
+ * `lat`/`lng` are the centroid (mean position) of every active establishment in the
+ * authority, not a real administrative boundary — good enough to place a single map
+ * marker per area without needing a GeoJSON boundary dataset this app doesn't have.
+ */
+export async function getAreaHygieneStats(minSample: number = MIN_COMPARE_AREA_SAMPLE): Promise<AreaHygieneStats[]> {
+  const rows = await prisma.$queryRaw<AreaHygieneStatsRow[]>`
+    SELECT
+      "localAuthorityName",
+      COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" ~ '^[0-5]$') AS "ratedCount",
+      AVG(("ratingValue")::int) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" ~ '^[0-5]$')::float8 AS avg,
+      COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" = '5') AS count5,
+      COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" IN ('4', '5')) AS count4or5,
+      COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" IN ('0', '1', '2')) AS count0to2,
+      COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" = '0') AS count0,
+      AVG("latitude")::float8 AS lat,
+      AVG("longitude")::float8 AS lng
+    FROM "Establishment"
+    WHERE "isActive" = true
+    GROUP BY "localAuthorityName"
+    HAVING COUNT(*) FILTER (WHERE "schemeType" = 'FHRS' AND "ratingValue" ~ '^[0-5]$') >= ${minSample}
+  `;
+
+  return rows
+    .filter((row) => row.lat !== null && row.lng !== null)
+    .map((row) => {
+      const ratedCount = Number(row.ratedCount);
+      return {
+        localAuthorityName: row.localAuthorityName,
+        slug: getLocalAuthorityByName(row.localAuthorityName)?.slug ?? null,
+        lat: row.lat as number,
+        lng: row.lng as number,
+        ratedCount,
+        averageRating: Math.round(row.avg * 100) / 100,
+        pctRated5: Math.round((Number(row.count5) / ratedCount) * 1000) / 10,
+        pctRated4Or5: Math.round((Number(row.count4or5) / ratedCount) * 1000) / 10,
+        pctRated0To2: Math.round((Number(row.count0to2) / ratedCount) * 1000) / 10,
+        count0: Number(row.count0),
+        count0To2: Number(row.count0to2),
+      };
+    });
 }

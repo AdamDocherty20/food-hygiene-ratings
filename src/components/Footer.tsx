@@ -76,6 +76,7 @@ export function Footer() {
               title="Explore"
               links={[
                 { href: "/area", label: "Browse by Area" },
+                { href: "/food-hygiene-map", label: "Hygiene Map" },
                 { href: "/guide", label: "Guide" },
                 { href: "/blog", label: "Blog" },
                 { href: "/about", label: "About & FAQ" },

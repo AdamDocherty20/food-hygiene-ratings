@@ -28,6 +28,31 @@ export const FHRS_SCORE_COLOR_CLASSES: Record<string, string> = {
   "0": "bg-red-700",
 };
 
+// Same six-step gradient as FHRS_SCORE_COLOR_CLASSES, as literal hex values — for the
+// /food-hygiene-map establishment markers, which are plain Leaflet divIcons (raw HTML
+// strings built outside React, not JSX) and so can't rely on Tailwind's class scanning to
+// pick up dynamically-interpolated class names. Kept in lockstep with the Tailwind
+// version above rather than computed from it, since there's no reliable way to resolve a
+// Tailwind class to its hex value at runtime without the full Tailwind engine.
+export const FHRS_SCORE_HEX: Record<string, string> = {
+  "5": "#15803d",
+  "4": "#16a34a",
+  "3": "#facc15",
+  "2": "#f59e0b",
+  "1": "#c2410c",
+  "0": "#b91c1c",
+};
+
+// Hex equivalents of getRatingBand's three bands, plus gray — same "raw HTML, no
+// Tailwind class scanning" reasoning as FHRS_SCORE_HEX above. Used for FHIS (Scotland)
+// markers, which have no 0-5 score to look up in FHRS_SCORE_HEX.
+export const RATING_BAND_HEX: Record<RatingBand, string> = {
+  green: "#15803d",
+  amber: "#f59e0b",
+  red: "#b91c1c",
+  gray: "#6b7280",
+};
+
 // FHIS (Scotland) is pass/fail rather than a numeric scale.
 export const FHIS_SCALE: { score: string; meaning: string }[] = [
   { score: "Pass", meaning: "The business meets the required food hygiene standards" },
