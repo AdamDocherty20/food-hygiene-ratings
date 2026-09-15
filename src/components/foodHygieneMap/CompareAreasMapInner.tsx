@@ -1,10 +1,10 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import Link from "next/link";
+import type { Feature, FeatureCollection, Geometry } from "geojson";
+import type { Layer, Path, PathOptions } from "leaflet";
 import { useEffect, useMemo, useState } from "react";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { GeoJSON, MapContainer, TileLayer } from "react-leaflet";
 import type { AreaHygieneStats } from "@/lib/area-queries";
 import { buildColorScale, getCompareMetric } from "@/lib/compare-metrics";
 
@@ -13,50 +13,78 @@ interface CompareAreasMapInnerProps {
   heightClassName: string;
 }
 
+interface BoundaryProperties {
+  localAuthorityName: string;
+  country: "England" | "Wales" | "Scotland" | "Northern Ireland" | "Unknown";
+}
+
 const UK_CENTER: [number, number] = [54.5, -3];
 const UK_DEFAULT_ZOOM = 6;
+const NO_DATA_FILL = "#d1d5db"; // gray-300 — areas with no qualifying stats
 
 const TILE_URL = process.env.NEXT_PUBLIC_TILE_URL || "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 const TILE_ATTRIBUTION =
   process.env.NEXT_PUBLIC_TILE_ATTRIBUTION ||
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
-const areaIconCache = new Map<string, L.DivIcon>();
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+}
 
-function buildAreaIcon(label: string, color: string): L.DivIcon {
-  const key = `${label}:${color}`;
-  const cached = areaIconCache.get(key);
-  if (cached) return cached;
+function buildPopupHtml(name: string, area: AreaHygieneStats | undefined, country: string): string {
+  const safeName = escapeHtml(name);
+  if (!area) {
+    const reason =
+      country === "Scotland"
+        ? "Scotland uses a separate scheme (FHIS Pass/Improvement Required), not the 0-5 FHRS scale this comparison is based on."
+        : "Not enough numerically rated establishments yet to include in this comparison.";
+    return `<div style="min-width:200px;max-width:240px;font-family:ui-sans-serif,system-ui,sans-serif;">
+      <p style="margin:0;font-size:13px;font-weight:600;color:#111827;">${safeName}</p>
+      <p style="margin:6px 0 0;font-size:12px;color:#6b7280;">${reason}</p>
+    </div>`;
+  }
 
-  const icon = L.divIcon({
-    className: "",
-    html: `<div style="min-width:40px;height:28px;padding:0 6px;border-radius:9999px;background:${color};border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:11px;font-family:ui-sans-serif,system-ui,sans-serif;white-space:nowrap;">${label}</div>`,
-    iconSize: [44, 28],
-    iconAnchor: [22, 14],
-    popupAnchor: [0, -14],
-  });
-  areaIconCache.set(key, icon);
-  return icon;
+  const row = (label: string, value: string) =>
+    `<div style="display:flex;justify-content:space-between;gap:12px;"><span>${label}</span><span style="font-weight:600;color:#111827;">${value}</span></div>`;
+
+  const viewLink = area.slug
+    ? `<a href="/area/${area.slug}" style="margin-top:10px;display:flex;align-items:center;justify-content:center;width:100%;border-radius:6px;background:#4f46e5;padding:6px 12px;font-size:12px;font-weight:600;color:#fff;text-decoration:none;">View ${safeName}</a>`
+    : "";
+
+  return `<div style="min-width:220px;max-width:260px;font-family:ui-sans-serif,system-ui,sans-serif;">
+    <p style="margin:0;font-size:13px;font-weight:600;color:#111827;">${safeName}</p>
+    <div style="margin-top:8px;display:flex;flex-direction:column;gap:4px;font-size:12px;color:#4b5563;">
+      ${row("Rated establishments", area.ratedCount.toLocaleString("en-GB"))}
+      ${row("Average rating", area.averageRating.toFixed(2))}
+      ${row("Rated 5", `${area.pctRated5}%`)}
+      ${row("Rated 4 or 5", `${area.pctRated4Or5}%`)}
+      ${row("Rated 0-2", `${area.pctRated0To2}%`)}
+    </div>
+    ${viewLink}
+  </div>`;
 }
 
 export default function CompareAreasMapInner({ metric, heightClassName }: CompareAreasMapInnerProps) {
   const [stats, setStats] = useState<AreaHygieneStats[] | null>(null);
+  const [boundaries, setBoundaries] = useState<FeatureCollection<Geometry, BoundaryProperties> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // No initial setLoading(true)/setError(null) here — loading/error already start at
-    // true/null, and this effect only ever runs once (this component only takes a
-    // `metric` prop, which doesn't affect what data to fetch), so there's nothing to reset.
     const controller = new AbortController();
-    fetch("/api/local-authorities/hygiene-stats", { signal: controller.signal })
-      .then(async (res) => {
+    Promise.all([
+      fetch("/api/local-authorities/hygiene-stats", { signal: controller.signal }).then((res) => {
         if (!res.ok) throw new Error("Failed to load area comparison data.");
-        const body = (await res.json()) as { data: AreaHygieneStats[] };
-        return body.data;
-      })
-      .then((data) => {
-        setStats(data);
+        return res.json() as Promise<{ data: AreaHygieneStats[] }>;
+      }),
+      fetch("/boundaries/uk-local-authorities.geojson", { signal: controller.signal }).then((res) => {
+        if (!res.ok) throw new Error("Failed to load area boundaries.");
+        return res.json() as Promise<FeatureCollection<Geometry, BoundaryProperties>>;
+      }),
+    ])
+      .then(([statsBody, boundariesBody]) => {
+        setStats(statsBody.data);
+        setBoundaries(boundariesBody);
         setLoading(false);
       })
       .catch((err: unknown) => {
@@ -68,7 +96,32 @@ export default function CompareAreasMapInner({ metric, heightClassName }: Compar
   }, []);
 
   const metricOption = getCompareMetric(metric);
-  const colorScale = useMemo(() => (stats ? buildColorScale(stats, metricOption) : () => "#6b7280"), [stats, metricOption]);
+  const statsByName = useMemo(() => {
+    const map = new Map<string, AreaHygieneStats>();
+    stats?.forEach((area) => map.set(area.localAuthorityName, area));
+    return map;
+  }, [stats]);
+  const colorScale = useMemo(() => (stats ? buildColorScale(stats, metricOption) : () => NO_DATA_FILL), [stats, metricOption]);
+
+  function styleFeature(feature?: Feature<Geometry, BoundaryProperties>): PathOptions {
+    const area = feature ? statsByName.get(feature.properties.localAuthorityName) : undefined;
+    return {
+      fillColor: area ? colorScale(area) : NO_DATA_FILL,
+      fillOpacity: area ? 0.75 : 0.35,
+      color: "#ffffff",
+      weight: 1,
+    };
+  }
+
+  function onEachFeature(feature: Feature<Geometry, BoundaryProperties>, layer: Layer) {
+    const { localAuthorityName, country } = feature.properties;
+    const area = statsByName.get(localAuthorityName);
+    layer.bindPopup(buildPopupHtml(localAuthorityName, area, country));
+    layer.on({
+      mouseover: (e) => (e.target as Path).setStyle({ weight: 2, fillOpacity: (area ? 0.75 : 0.35) + 0.15 }),
+      mouseout: (e) => (e.target as Path).setStyle(styleFeature(feature)),
+    });
+  }
 
   return (
     <div className={`relative w-full ${heightClassName}`}>
@@ -80,50 +133,29 @@ export default function CompareAreasMapInner({ metric, heightClassName }: Compar
       >
         <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
 
-        {stats?.map((area) => (
-          <Marker
-            key={area.localAuthorityName}
-            position={[area.lat, area.lng]}
-            icon={buildAreaIcon(metricOption.format(area), colorScale(area))}
-          >
-            <Popup>
-              <div className="min-w-[220px] max-w-[260px]">
-                <p className="text-sm font-semibold text-gray-900">{area.localAuthorityName}</p>
-                <dl className="mt-2 flex flex-col gap-1 text-xs text-gray-600">
-                  <div className="flex justify-between gap-3">
-                    <dt>Rated establishments</dt>
-                    <dd className="font-medium text-gray-900">{area.ratedCount.toLocaleString("en-GB")}</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt>Average rating</dt>
-                    <dd className="font-medium text-gray-900">{area.averageRating.toFixed(2)}</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt>Rated 5</dt>
-                    <dd className="font-medium text-gray-900">{area.pctRated5}%</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt>Rated 4 or 5</dt>
-                    <dd className="font-medium text-gray-900">{area.pctRated4Or5}%</dd>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <dt>Rated 0-2</dt>
-                    <dd className="font-medium text-gray-900">{area.pctRated0To2}%</dd>
-                  </div>
-                </dl>
-                {area.slug && (
-                  <Link
-                    href={`/area/${area.slug}`}
-                    className="mt-3 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-indigo-700"
-                  >
-                    View {area.localAuthorityName}
-                  </Link>
-                )}
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {/* Keyed by metric: Leaflet's GeoJSON layer computes each feature's style once,
+            imperatively, when it's added — it doesn't re-run `style` on a prop change, so
+            switching metrics needs a fresh layer (react-leaflet's own recommended pattern
+            for this) rather than relying on it to reactively restyle in place. */}
+        {boundaries && <GeoJSON key={metric} data={boundaries} style={styleFeature} onEachFeature={onEachFeature} />}
       </MapContainer>
+
+      {!loading && !error && (
+        <div className="absolute right-3 bottom-3 z-[1000] flex flex-col gap-1 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 text-xs text-gray-600 shadow-md">
+          <span className="font-medium text-gray-700">{metricOption.label}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm" style={{ background: "hsl(0,65%,40%)" }} aria-hidden />
+            Lower
+            <span className="mx-1 h-3 w-8 rounded-sm bg-gradient-to-r from-red-700 via-yellow-400 to-green-700" aria-hidden />
+            Higher
+            <span className="h-3 w-3 rounded-sm" style={{ background: "hsl(120,65%,40%)" }} aria-hidden />
+          </div>
+          <div className="mt-1 flex items-center gap-1.5 border-t border-gray-100 pt-1">
+            <span className="h-3 w-3 rounded-sm" style={{ background: NO_DATA_FILL }} aria-hidden />
+            No comparable data
+          </div>
+        </div>
+      )}
 
       {loading && (
         <div
