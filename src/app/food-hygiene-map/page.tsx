@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { AreaRankings } from "@/components/foodHygieneMap/AreaRankings";
 import { FoodHygieneMapClient } from "@/components/foodHygieneMap/FoodHygieneMapClient";
-import { MIN_COMPARE_AREA_SAMPLE } from "@/lib/area-queries";
+import { getAreaHygieneStats, MIN_COMPARE_AREA_SAMPLE } from "@/lib/area-queries";
 import { formatDate } from "@/lib/format";
-import { buildBreadcrumbJsonLd } from "@/lib/jsonld";
+import { buildBreadcrumbJsonLd, buildItemListJsonLd } from "@/lib/jsonld";
 import { prisma } from "@/lib/prisma";
 import { FHRS_SCALE, FHRS_SCORE_COLOR_CLASSES } from "@/lib/rating-scale";
 
@@ -20,20 +21,42 @@ export const metadata: Metadata = {
   openGraph: { title: TITLE, description: DESCRIPTION, url: `${SITE_URL}/food-hygiene-map` },
 };
 
+// This page now does real server-side data fetching (the rankings below, "Data last
+// updated") on top of what used to be static copy — without a revalidate window it would
+// bake into the build and never reflect the daily FSA sync until the next deploy. Same
+// hourly window as /area, /blog and /guide/best-rated-areas.
+export const revalidate = 3600;
+
 export default async function FoodHygieneMapPage() {
   // Same "most recent lastSeenAt across active rows" freshness signal sitemap.ts already
   // relies on — genuinely the last time the FSA sync touched the data, not a hardcoded date.
   const latestSync = await prisma.establishment.aggregate({ _max: { lastSeenAt: true }, where: { isActive: true } });
   const dataUpdatedAt = formatDate(latestSync._max.lastSeenAt?.toISOString() ?? null);
 
+  const areaStats = await getAreaHygieneStats();
+  const rankedAreas = [...areaStats].sort((a, b) => b.averageRating - a.averageRating);
+
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: "Home", url: SITE_URL },
     { name: "UK Food Hygiene Map", url: `${SITE_URL}/food-hygiene-map` },
   ]);
 
+  // The top 10 is the most citation-worthy slice of the rankings below — eligible for a
+  // rich "list" result the way /guide/best-rated-areas's own leaderboard already is.
+  const top10JsonLd = buildItemListJsonLd({
+    name: "UK's best-rated areas for food hygiene",
+    description: "UK local authorities ranked by average Food Hygiene Rating Scheme (FHRS) score.",
+    url: `${SITE_URL}/food-hygiene-map`,
+    items: rankedAreas
+      .slice(0, 10)
+      .filter((area) => area.slug)
+      .map((area) => ({ url: `${SITE_URL}/area/${area.slug}`, name: area.localAuthorityName })),
+  });
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(top10JsonLd) }} />
 
       <nav className="text-sm text-gray-500">
         <Link href="/" className="hover:text-indigo-600 hover:underline">
@@ -60,6 +83,8 @@ export default async function FoodHygieneMapPage() {
           <FoodHygieneMapClient />
         </Suspense>
       </div>
+
+      <AreaRankings stats={areaStats} minSample={MIN_COMPARE_AREA_SAMPLE} dataUpdatedAt={dataUpdatedAt} />
 
       <section className="mt-10 grid grid-cols-1 gap-8 border-t border-gray-200 pt-8 sm:grid-cols-2">
         <div>
@@ -106,18 +131,19 @@ export default async function FoodHygieneMapPage() {
             inspection result typically appears here within 24 hours.
           </p>
 
-          <h2 className="mt-6 text-lg font-semibold text-gray-900">Compare areas methodology</h2>
+          <h2 className="mt-6 text-lg font-semibold text-gray-900">Rankings &amp; Compare areas methodology</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Compare areas ranks UK local authorities by their Food Hygiene Rating Scheme (FHRS) statistics only —
+            Both the rankings above and Compare areas use UK local authorities&apos; Food Hygiene Rating Scheme (FHRS)
+            statistics only —
             average rating, and the percentage of rated establishments scoring 5, 4-5, or 0-2. Scotland&apos;s FHIS
             scheme has no numeric score to average or bucket this way, so Scottish local authorities are excluded
             from these specific calculations rather than shown with a converted or estimated figure.
           </p>
           <p className="mt-2 text-sm text-gray-600">
-            An area only appears once it has at least {MIN_COMPARE_AREA_SAMPLE} numerically rated establishments, so
-            a small sample size can&apos;t produce a misleadingly perfect (or poor) score. Area markers are placed at
-            the average location of every active establishment in that authority — an approximation, not an official
-            administrative boundary. See{" "}
+            An area only appears in the rankings, and is shaded on the Compare areas map, once it has at least{" "}
+            {MIN_COMPARE_AREA_SAMPLE} numerically rated establishments, so a small sample size can&apos;t produce a
+            misleadingly perfect (or poor) score — areas below that threshold, and all of Scotland, are shown in grey
+            on the map rather than omitted silently. See{" "}
             <Link href="/guide/best-rated-areas" className="text-indigo-600 hover:underline">
               the UK&apos;s highest-rated areas
             </Link>{" "}
