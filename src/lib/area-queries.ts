@@ -87,46 +87,6 @@ export async function getTopRatedInArea(
   return { establishments, total, page, totalPages: Math.max(1, Math.ceil(total / TOP_RATED_LIMIT)) };
 }
 
-// A meaningful-sample floor for the leaderboard below — without it, a tiny area with a
-// handful of perfect-scoring businesses could outrank somewhere genuinely more consistent
-// on the strength of a small sample. Chosen well below the smallest real areas' typical
-// establishment counts (see local-authorities.ts) so this excludes only the true outliers.
-const MIN_LEADERBOARD_SAMPLE = 300;
-
-export interface AreaRatingLeaderboardEntry {
-  localAuthorityName: string;
-  averageRating: number;
-  ratedCount: number;
-}
-
-/**
- * The UK's highest (numeric-FHRS-)rated local authorities, for /guide/best-rated-areas —
- * same AVG(("ratingValue")::int) pattern as getLocalAuthorityAverageRating in
- * establishment-detail.ts, just grouped across every area in one query instead of scoped
- * to one. FHRS-only (England/Wales/NI): FHIS's pass/improvement-required scale (Scotland)
- * has no numeric average to rank by, so Scottish areas can't appear here — that's a real
- * limitation of the comparison, not an oversight, and the page this feeds should say so.
- */
-export async function getAreaRatingLeaderboard(limit: number = 20): Promise<AreaRatingLeaderboardEntry[]> {
-  const rows = await prisma.$queryRaw<{ localAuthorityName: string; avg: number; count: bigint }[]>`
-    SELECT "localAuthorityName", AVG(("ratingValue")::int)::float8 AS avg, COUNT(*) AS count
-    FROM "Establishment"
-    WHERE "isActive" = true
-      AND "schemeType" = 'FHRS'
-      AND "ratingValue" ~ '^[0-5]$'
-    GROUP BY "localAuthorityName"
-    HAVING COUNT(*) >= ${MIN_LEADERBOARD_SAMPLE}
-    ORDER BY avg DESC, count DESC
-    LIMIT ${limit}
-  `;
-
-  return rows.map((row) => ({
-    localAuthorityName: row.localAuthorityName,
-    averageRating: Math.round(row.avg * 100) / 100,
-    ratedCount: Number(row.count),
-  }));
-}
-
 // The minimum number of *numerically rated* (FHRS 0-5) establishments a local authority
 // needs before it's included in Compare Areas at all — without this, an authority with a
 // handful of establishments could show a misleading 100%-rated-5 purely from small-sample
@@ -164,11 +124,11 @@ interface AreaHygieneStatsRow {
 }
 
 /**
- * Per-local-authority hygiene statistics for the /food-hygiene-map "Compare areas" mode.
- * FHRS-only (England/Wales/NI) for every rated-establishment calculation, same reasoning
- * as getAreaRatingLeaderboard above — Scotland's FHIS scale has no numeric score to
- * average or bucket into "rated 5" / "rated 0-2", so mixing it in would be meaningless
- * rather than just incomplete. Scottish-only authorities simply won't meet the
+ * Per-local-authority hygiene statistics for /food-hygiene-map's rankings and "Compare
+ * areas" mode. FHRS-only (England/Wales/NI) for every rated-establishment calculation —
+ * Scotland's FHIS scale has no numeric score to average or bucket into "rated 5" /
+ * "rated 0-2", so mixing it in would be meaningless rather than just incomplete.
+ * Scottish-only authorities simply won't meet the
  * `ratedCount >= minSample` bar and are absent from the result, not shown with fabricated
  * numbers.
  *

@@ -110,10 +110,10 @@ export default function GuidePage() {
         <h2 className="text-lg font-semibold text-gray-900">Curious how areas compare?</h2>
         <p className="mt-2 text-sm text-gray-600">
           See{" "}
-          <Link href="/guide/best-rated-areas" className="text-indigo-600 hover:underline">
-            the UK&apos;s highest-rated areas for food hygiene
+          <Link href="/food-hygiene-map" className="text-indigo-600 hover:underline">
+            the UK&apos;s highest- and lowest-rated areas for food hygiene
           </Link>
-          , ranked by average FHRS score across every business we have data for.
+          , ranked by average FHRS score, alongside an interactive map for exploring every area yourself.
         </p>
       </section>
 
