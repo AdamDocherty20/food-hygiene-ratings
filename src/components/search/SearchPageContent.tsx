@@ -13,7 +13,7 @@ import {
 import { EstablishmentMap, type MapPoint, type SearchThisAreaQuery } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
 import { RecentlyViewedStrip } from "@/components/RecentlyViewedStrip";
-import { BUSINESS_CATEGORIES, getCategoryImagePath } from "@/lib/business-categories";
+import { BUSINESS_CATEGORIES } from "@/lib/business-categories";
 import { CUISINES, getCuisineImagePath } from "@/lib/cuisines";
 import { formatAddress } from "@/lib/format";
 import { LOCAL_AUTHORITIES, LONDON_BOROUGHS } from "@/lib/local-authorities";
@@ -635,33 +635,23 @@ export function SearchPageContent() {
                     <li key={result.id}>
                       <Link
                         href={establishmentPath(result.fhrsId, result.businessName)}
-                        className="flex gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+                        className="flex items-start justify-between gap-4 rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
                       >
-                        <img
-                          src={getCategoryImagePath(result.businessTypeId)}
-                          alt=""
-                          className="h-20 w-20 shrink-0 rounded-lg object-cover"
-                          loading="lazy"
-                          width={80}
-                          height={80}
-                        />
-                        <div className="flex flex-1 items-start justify-between gap-4">
-                          <div>
-                            <p className="font-semibold text-gray-900">{result.businessName}</p>
-                            <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
-                            <p className="mt-1 text-sm text-gray-600">{formatAddress(result)}</p>
-                            {typeof result.distanceMiles === "number" && (
-                              <p className="mt-1 text-xs font-medium text-indigo-600">
-                                {result.distanceMiles.toFixed(1)} mi away
-                              </p>
-                            )}
-                          </div>
-                          <RatingBadge
-                            schemeType={result.schemeType}
-                            ratingValue={result.ratingValue}
-                            ratingDate={result.ratingDate}
-                          />
+                        <div>
+                          <p className="font-semibold text-gray-900">{result.businessName}</p>
+                          <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
+                          <p className="mt-1 text-sm text-gray-600">{formatAddress(result)}</p>
+                          {typeof result.distanceMiles === "number" && (
+                            <p className="mt-1 text-xs font-medium text-indigo-600">
+                              {result.distanceMiles.toFixed(1)} mi away
+                            </p>
+                          )}
                         </div>
+                        <RatingBadge
+                          schemeType={result.schemeType}
+                          ratingValue={result.ratingValue}
+                          ratingDate={result.ratingDate}
+                        />
                       </Link>
                     </li>
                   ))}

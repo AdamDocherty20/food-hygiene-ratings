@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { ApiError, searchEstablishments, searchNearby } from "@/lib/api-client";
 import { EstablishmentMap, type MapPoint } from "@/components/EstablishmentMap";
 import { RatingBadge } from "@/components/RatingBadge";
-import { getCategoryImagePath } from "@/lib/business-categories";
 import { formatAddress } from "@/lib/format";
 import { establishmentPath } from "@/lib/slug";
 import type { Establishment, EstablishmentWithDistance } from "@/lib/types";
@@ -154,29 +153,19 @@ export function CuisineNearMe({ slug, label }: { slug: string; label: string }) 
                 <li key={result.id}>
                   <Link
                     href={establishmentPath(result.fhrsId, result.businessName)}
-                    className="flex gap-3 rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+                    className="flex items-start justify-between gap-4 rounded-xl border border-gray-200 bg-white p-3 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
                   >
-                    <img
-                      src={getCategoryImagePath(result.businessTypeId)}
-                      alt=""
-                      className="h-20 w-20 shrink-0 rounded-lg object-cover"
-                      loading="lazy"
-                      width={80}
-                      height={80}
-                    />
-                    <div className="flex flex-1 items-start justify-between gap-4">
-                      <div>
-                        <p className="font-semibold text-gray-900">{result.businessName}</p>
-                        <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
-                        <p className="mt-1 text-sm text-gray-600">{formatAddress(result)}</p>
-                        {"distanceMiles" in result && typeof (result as EstablishmentWithDistance).distanceMiles === "number" && (
-                          <p className="mt-1 text-xs font-medium text-indigo-600">
-                            {(result as EstablishmentWithDistance).distanceMiles.toFixed(1)} mi away
-                          </p>
-                        )}
-                      </div>
-                      <RatingBadge schemeType={result.schemeType} ratingValue={result.ratingValue} ratingDate={result.ratingDate} />
+                    <div>
+                      <p className="font-semibold text-gray-900">{result.businessName}</p>
+                      <p className="mt-0.5 text-sm text-gray-500">{result.businessType}</p>
+                      <p className="mt-1 text-sm text-gray-600">{formatAddress(result)}</p>
+                      {"distanceMiles" in result && typeof (result as EstablishmentWithDistance).distanceMiles === "number" && (
+                        <p className="mt-1 text-xs font-medium text-indigo-600">
+                          {(result as EstablishmentWithDistance).distanceMiles.toFixed(1)} mi away
+                        </p>
+                      )}
                     </div>
+                    <RatingBadge schemeType={result.schemeType} ratingValue={result.ratingValue} ratingDate={result.ratingDate} />
                   </Link>
                 </li>
               ))}
