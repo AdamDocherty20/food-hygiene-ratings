@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 
 interface CompareAreasMapProps {
   metric: string;
+  colorblindMode: boolean;
   heightClassName?: string;
 }
 
@@ -20,6 +21,6 @@ const CompareAreasMapInner = dynamic(() => import("@/components/foodHygieneMap/C
   ),
 });
 
-export function CompareAreasMap({ metric, heightClassName = DEFAULT_HEIGHT_CLASSNAME }: CompareAreasMapProps) {
-  return <CompareAreasMapInner metric={metric} heightClassName={heightClassName} />;
+export function CompareAreasMap({ metric, colorblindMode, heightClassName = DEFAULT_HEIGHT_CLASSNAME }: CompareAreasMapProps) {
+  return <CompareAreasMapInner metric={metric} colorblindMode={colorblindMode} heightClassName={heightClassName} />;
 }

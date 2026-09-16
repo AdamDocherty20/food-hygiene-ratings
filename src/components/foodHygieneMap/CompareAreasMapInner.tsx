@@ -6,11 +6,12 @@ import type { Layer, Path, PathOptions } from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { GeoJSON, MapContainer, TileLayer } from "react-leaflet";
 import type { AreaHygieneStats } from "@/lib/area-queries";
-import { buildColorScale, getCompareMetric } from "@/lib/compare-metrics";
+import { buildColorScale, getCompareMetric, getScaleColor, getScaleGradientCss } from "@/lib/compare-metrics";
 
 interface CompareAreasMapInnerProps {
   metric: string;
   heightClassName: string;
+  colorblindMode: boolean;
 }
 
 interface BoundaryProperties {
@@ -64,7 +65,7 @@ function buildPopupHtml(name: string, area: AreaHygieneStats | undefined, countr
   </div>`;
 }
 
-export default function CompareAreasMapInner({ metric, heightClassName }: CompareAreasMapInnerProps) {
+export default function CompareAreasMapInner({ metric, heightClassName, colorblindMode }: CompareAreasMapInnerProps) {
   const [stats, setStats] = useState<AreaHygieneStats[] | null>(null);
   const [boundaries, setBoundaries] = useState<FeatureCollection<Geometry, BoundaryProperties> | null>(null);
   const [loading, setLoading] = useState(true);
@@ -101,7 +102,10 @@ export default function CompareAreasMapInner({ metric, heightClassName }: Compar
     stats?.forEach((area) => map.set(area.localAuthorityName, area));
     return map;
   }, [stats]);
-  const colorScale = useMemo(() => (stats ? buildColorScale(stats, metricOption) : () => NO_DATA_FILL), [stats, metricOption]);
+  const colorScale = useMemo(
+    () => (stats ? buildColorScale(stats, metricOption, colorblindMode) : () => NO_DATA_FILL),
+    [stats, metricOption, colorblindMode],
+  );
 
   function styleFeature(feature?: Feature<Geometry, BoundaryProperties>): PathOptions {
     const area = feature ? statsByName.get(feature.properties.localAuthorityName) : undefined;
@@ -133,22 +137,29 @@ export default function CompareAreasMapInner({ metric, heightClassName }: Compar
       >
         <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
 
-        {/* Keyed by metric: Leaflet's GeoJSON layer computes each feature's style once,
-            imperatively, when it's added — it doesn't re-run `style` on a prop change, so
-            switching metrics needs a fresh layer (react-leaflet's own recommended pattern
-            for this) rather than relying on it to reactively restyle in place. */}
-        {boundaries && <GeoJSON key={metric} data={boundaries} style={styleFeature} onEachFeature={onEachFeature} />}
+        {/* Keyed by metric + colour mode: Leaflet's GeoJSON layer computes each feature's
+            style once, imperatively, when it's added — it doesn't re-run `style` on a prop
+            change, so switching metrics or toggling colourblind mode needs a fresh layer
+            (react-leaflet's own recommended pattern for this) rather than relying on it to
+            reactively restyle in place. */}
+        {boundaries && (
+          <GeoJSON key={`${metric}:${colorblindMode}`} data={boundaries} style={styleFeature} onEachFeature={onEachFeature} />
+        )}
       </MapContainer>
 
       {!loading && !error && (
         <div className="absolute right-3 bottom-3 z-[1000] flex flex-col gap-1 rounded-lg border border-gray-200 bg-white/95 px-3 py-2 text-xs text-gray-600 shadow-md">
           <span className="font-medium text-gray-700">{metricOption.label}</span>
           <div className="flex items-center gap-1.5">
-            <span className="h-3 w-3 rounded-sm" style={{ background: "hsl(0,65%,40%)" }} aria-hidden />
+            <span className="h-3 w-3 rounded-sm" style={{ background: getScaleColor(0, colorblindMode) }} aria-hidden />
             Lower
-            <span className="mx-1 h-3 w-8 rounded-sm bg-gradient-to-r from-red-700 via-yellow-400 to-green-700" aria-hidden />
+            <span
+              className="mx-1 h-3 w-8 rounded-sm"
+              style={{ background: getScaleGradientCss(colorblindMode) }}
+              aria-hidden
+            />
             Higher
-            <span className="h-3 w-3 rounded-sm" style={{ background: "hsl(120,65%,40%)" }} aria-hidden />
+            <span className="h-3 w-3 rounded-sm" style={{ background: getScaleColor(1, colorblindMode) }} aria-hidden />
           </div>
           <div className="mt-1 flex items-center gap-1.5 border-t border-gray-100 pt-1">
             <span className="h-3 w-3 rounded-sm" style={{ background: NO_DATA_FILL }} aria-hidden />

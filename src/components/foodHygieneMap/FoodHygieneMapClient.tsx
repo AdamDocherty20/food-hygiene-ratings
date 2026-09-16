@@ -46,6 +46,7 @@ export function FoodHygieneMapClient() {
   const [ratings, setRatings] = useState<string[]>(() => parseListParam(searchParams.get("ratings")));
   const [categorySlugs, setCategorySlugs] = useState<string[]>(() => parseListParam(searchParams.get("types")));
   const [metric, setMetric] = useState<string>(() => searchParams.get("metric") || COMPARE_METRICS[0].value);
+  const [colorblindMode, setColorblindMode] = useState<boolean>(() => searchParams.get("cb") === "1");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [searchInput, setSearchInput] = useState(() => searchParams.get("location") || "");
@@ -121,12 +122,13 @@ export function FoodHygieneMapClient() {
     if (ratings.length > 0) params.set("ratings", ratings.join(","));
     if (categorySlugs.length > 0) params.set("types", categorySlugs.join(","));
     if (mode === "compare" && metric !== COMPARE_METRICS[0].value) params.set("metric", metric);
+    if (mode === "compare" && colorblindMode) params.set("cb", "1");
     if (committedLocation.trim()) params.set("location", committedLocation.trim());
 
     const query = params.toString();
     const url = query ? `${pathname}?${query}` : pathname;
     window.history.replaceState(null, "", url);
-  }, [mode, ratings, categorySlugs, metric, committedLocation, pathname]);
+  }, [mode, ratings, categorySlugs, metric, colorblindMode, committedLocation, pathname]);
 
   function toggleRating(value: string) {
     setRatings((prev) => {
@@ -310,6 +312,16 @@ export function FoodHygieneMapClient() {
                 {option.label}
               </button>
             ))}
+
+            <label className="ml-auto flex items-center gap-1.5 text-xs font-medium text-gray-600">
+              <input
+                type="checkbox"
+                checked={colorblindMode}
+                onChange={(e) => setColorblindMode(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              Colourblind-friendly colours
+            </label>
           </div>
         )}
       </div>
@@ -324,7 +336,7 @@ export function FoodHygieneMapClient() {
           onReportClick={handleReportClick}
         />
       ) : (
-        <CompareAreasMap metric={metric} />
+        <CompareAreasMap metric={metric} colorblindMode={colorblindMode} />
       )}
     </div>
   );
