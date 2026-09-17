@@ -30,7 +30,13 @@ export default async function sitemap({ id }: { id: Promise<string> }): Promise<
   return establishments.map((establishment) => ({
     url: `${SITE_URL}${establishmentPath(establishment.fhrsId, establishment.businessName)}`,
     lastModified: establishment.updatedAt,
-    changeFrequency: "daily" as const,
+    // A single business's own rating changes on the order of months to years (whenever it's
+    // next re-inspected), not daily — "daily" here was overstating freshness on 600k+ pages
+    // and had no upside, since `lastModified` (tied to the real updatedAt) is the signal
+    // crawlers actually weight. Unlike the root sitemap's own "daily" entries (home,
+    // /food-hygiene-map, area pages), which genuinely do reflect new data every day because
+    // the underlying dataset refreshes daily even though any one business rarely does.
+    changeFrequency: "monthly" as const,
     priority: 0.3,
   }));
 }
